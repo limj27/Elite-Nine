@@ -21,6 +21,7 @@ CREATE TABLE Questions (
     Createed_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     Times_Used INT DEFAULT 0,
     Times_Answered_Correctly INT DEFAULT 0,
+    GridPosition VARCHAR(5),
 );
 
 CREATE TABLE Game (

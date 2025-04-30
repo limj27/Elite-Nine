@@ -7,29 +7,42 @@ import (
 	"os"
 	"time"
 	"trivia-server/handlers"
+	"trivia-server/sessions"
 
 	"github.com/go-redis/redis"
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	tlsKeyPath := getEnv("TLSKEY")
-	tlsCertPath := getEnv("TLSCERT")
-	sessionKey := getEnv("SESSIONKEY")
+	// Load environment variables
+	// tlsKeyPath := getEnv("TLSKEY")
+	// tlsCertPath := getEnv("TLSCERT")
+	// sessionKey := getEnv("SESSIONKEY")
 	redisaddr := getEnv("REDISADDR")
-	dsn := getEnv("DSN")
 	hour, _ := time.ParseDuration("1h")
+
+	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisaddr,
 		Password: "",
 		DB:       0,
 	})
 
-	http.HandleFunc("/ws", handlers.WsHandler)
+	// Initialize RedisStore
+	redisStore := sessions.NewRedisStore(redisClient, hour)
 
-	fmt.Println("Websocket server started on :8080")
-	err := http.ListenAndServe(":8080", nil)
+	// Initialize GameServer
+	gameServer := handlers.NewGameServer(redisStore)
+
+	// Set up router
+	router := mux.NewRouter()
+	gameServer.SetupRoutes(router)
+
+	// Start the server
+	fmt.Println("Server started on :8080")
+	err := http.ListenAndServe(":8080", router)
 	if err != nil {
-		fmt.Println("Error starting server: ", err)
+		log.Fatalf("Error starting server: %v", err)
 	}
 }
 
