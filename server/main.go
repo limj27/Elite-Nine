@@ -4,56 +4,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"time"
 	"trivia-server/handlers"
-	"trivia-server/sessions"
 
-	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 )
 
+const (
+	port = ":8080" // Port for the server to listen on
+)
+
 func main() {
-	// Load environment variables
-	// tlsKeyPath := getEnv("TLSKEY")
-	// tlsCertPath := getEnv("TLSCERT")
-	// sessionKey := getEnv("SESSIONKEY")
-	redisaddr := getEnv("REDISADDR")
-	hour, _ := time.ParseDuration("1h")
+	r := mux.NewRouter()
 
-	// Initialize Redis client
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisaddr,
-		Password: "",
-		DB:       0,
-	})
+	//WebSocket Endpoint for handling multiplayer game connections
+	r.HandleFunc("/ws", handlers.WsHandler)
 
-	// Initialize RedisStore
-	redisStore := sessions.NewRedisStore(redisClient, hour)
-
-	// Initialize GameServer
-	gameServer := handlers.NewGameServer(redisStore)
-
-	// Set up router
-	router := mux.NewRouter()
-	gameServer.SetupRoutes(router)
-
-	// Start the server
-	fmt.Println("Server started on :8080")
-	err := http.ListenAndServe(":8080", router)
-	if err != nil {
-		log.Fatalf("Error starting server: %v", err)
-	}
-}
-
-func getEnv(name string) string {
-	result := os.Getenv(name)
-	if len(result) == 0 {
-		envNotFound(name)
-	}
-	return result
-}
-
-func envNotFound(name string) {
-	log.Fatalf("%s not set or not found", name)
+	fmt.Println("Server running on port %s ...", port)
+	log.Fatal(http.ListenAndServe(port, r))
 }

@@ -1,0 +1,12 @@
+# Ignore these files when building Docker image
+.git
+.gitignore
+README.md
+Dockerfile
+docker-compose.yml
+.env
+.env.local
+node_modules
+logs/*.log
+*.tmp
+.DS_Store

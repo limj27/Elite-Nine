@@ -2,75 +2,58 @@ package handlers
 
 import (
 	"fmt"
-	"net/mail"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-var bcryptCost = 13
-
-// Struct to store information about the users. The json tags are also included
-// so that these structs can be used for data transfer between the client and the api.
 type User struct {
-	ID       int64  `json:"id"`
-	Email    string `json:"email"`
+	ID       string `json:"id"`
 	Username string `json:"username"`
-	Name     string `json:"name"`
 	PassHash []byte `json:"-"`
-}
-
-type Credentials struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Stats    struct {
+		Wins   int `json:"wins"`
+		Losses int `json:"losses"`
+	} `json:"stats"`
 }
 
 type NewUser struct {
-	Email        string `json:"email"`
-	Name         string `json:"name"`
+	Username     string `json:"username"`
 	Password     string `json:"password"`
-	PasswordConf string `json:"passwordConf"`
+	PasswordConf string `json:"passwordConfirm"`
 }
 
-type Updates struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
+func (u *NewUser) IsValid() error {
+	if u.Username == "" || u.Password == "" {
+		return fmt.Errorf("Invalid Username or Password")
+	}
 
-// Validates the new user and returns error if the rules fail
-func (nu *NewUser) Validate() error {
-	email, err := mail.ParseAddress(nu.Email)
-	if err != nil {
-		return fmt.Errorf("Invalid email address %v", email)
+	if len(u.Password) < 8 {
+		return fmt.Errorf("Password must be at least 8 characters long")
 	}
-	if len(nu.Password) < 6 {
-		return fmt.Errorf("Password %v is less than 6 characters", nu.Password)
+
+	if u.Password != u.PasswordConf {
+		return fmt.Errorf("Password and Password Confirmation do not match")
 	}
-	if nu.Password != nu.PasswordConf {
-		return fmt.Errorf("Password doesn't match confirmed password")
-	}
-	if len(nu.Name) <= 0 {
-		return fmt.Errorf("Provide a name")
-	}
+
 	return nil
 }
 
-// ToUser converts NewUser to a User
-func (nu *NewUser) ToUser() (*User, error) {
-	err := nu.Validate()
+func (u *NewUser) ToUser() (*User, error) {
+	err := u.IsValid()
 	if err != nil {
 		return nil, err
 	}
 	user := &User{}
-	user.Email = nu.Email
-	user.ID = 0
-	user.Name = nu.Name
-	user.SetPassword(nu.Password)
+	user.Username = u.Username
+	user.HashPassword(u.Password)
+	user.Stats.Wins = 0
+	user.Stats.Losses = 0
+	user.ID = fmt.Sprintf("%s-%d", user.Username, user.Stats.Wins+user.Stats.Losses) // Example ID generation
 	return user, nil
 }
 
-// Sets the user entered password into a hashed password in the User struct
-func (u *User) SetPassword(password string) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+func (u *User) HashPassword(password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -78,19 +61,10 @@ func (u *User) SetPassword(password string) error {
 	return nil
 }
 
-// When a user logs in, it compares the plaintext password against the store hash and returns the error
 func (u *User) Authenticate(password string) error {
 	err := bcrypt.CompareHashAndPassword(u.PassHash, []byte(password))
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (u *User) ApplyUpdates(updates *Updates) error {
-	if updates.Name == "" {
-		return fmt.Errorf("No new name provided, sticking with existing")
-	}
-	u.Name = updates.Name
 	return nil
 }

@@ -1,7 +1,7 @@
-package handlers
+package db
 
 import "database/sql"
 
 type MysqlStore struct {
-	DB *sql.DB
+	db *sql.DB
 }

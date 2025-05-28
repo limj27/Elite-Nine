@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    platform: linux/arm64/v8  # Specify ARM architecture for Pi
+    container_name: baseball_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-baseball_game}
+      MYSQL_USER: ${MYSQL_USER:-gameuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gamepassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d  # Auto-run SQL files on startup
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Limit memory usage on Pi
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - baseball_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis for session storage
+  redis:
+    image: redis:7-alpine
+    platform: linux/arm64/v8
+    container_name: baseball_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    restart: unless-stopped
+    networks:
+      - baseball_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go application (will be built when ready)
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: baseball_app
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=${MYSQL_USER:-gameuser}
+      - DB_PASSWORD=${MYSQL_PASSWORD:-gamepassword}
+      - DB_NAME=${MYSQL_DATABASE:-baseball_game}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=8080
+      - ENV=production
+    volumes:
+      - ./logs:/app/logs  # Mount logs directory
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    restart: unless-stopped
+    networks:
+      - baseball_network
+    # Uncomment when you have the Go app ready
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+
+# Named volumes for data persistence
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  baseball_network:
+    driver: bridge

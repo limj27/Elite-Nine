@@ -1,44 +1,48 @@
 package handlers
 
-import "github.com/gorilla/websocket"
+import (
+	"fmt"
+	"net/http"
 
-type Player struct {
-	ID       int64           `json:"id"`
-	UserName string          `json:"username"`
-	Conn     *websocket.Conn `json:"-"` // Exclude from JSON serialization
-}
-
-func (p *Player) NewPlayer(id int64, user *User) *Player {
-	return &Player{
-		ID:       id,
-		UserName: user.Username,
-	}
-}
+	"github.com/gorilla/websocket"
+)
 
 type Game struct {
-	ID      int64        `json:"id"`
-	Players []Player     `json:"players"`
-	Grid    [3][3]string `json:"grid"`
-	Turn    int          `json:"turn"`
+	ID      string    `json:"id"`
+	Board   [3][3]int `json:"board"`
+	Players []string  `json:"players"`
+	Turn    string    `jsons:"currentTurn"`
 }
 
-func (g *Game) NewGame(id int64, players []Player) *Game {
-	return &Game{
-		ID:      id,
-		Players: players,
-		Grid:    [3][3]string{},
-		Turn:    0,
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for simplicity; adjust as needed
+	},
+}
+
+func WsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Error upgrading:", err)
+		return
 	}
+
+	defer conn.Close()
+
+	go handleConnection(conn)
 }
 
-func (g *Game) ValidateAnswer(x, y int, answer string) bool {
-	// Validate the answer (e.g., compare with the database)
-	// If correct, update the grid and return true
-	g.Grid[x][y] = g.Players[g.Turn].UserName
-	g.Turn = (g.Turn + 1) % len(g.Players)
-	return true
-}
-
-func (g *Game) CheckWin() bool {
-	return false // Placeholder for win condition check
+func handleConnection(conn *websocket.Conn) {
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			fmt.Println("Error reading message:", err)
+			break
+		}
+		fmt.Println("Received message:", string(message))
+		if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			fmt.Println("Error writing message:", err)
+			break
+		}
+	}
 }
