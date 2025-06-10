@@ -15,7 +15,7 @@ type DB struct {
 }
 
 // NewConnection creates a new database connection
-func NewConnection() (*DB, error) {
+func NewConnection() (*sql.DB, error) {
 	// Get database configuration from environment
 	dbHost := os.Getenv("DB_HOST")
 	if dbHost == "" {
@@ -63,7 +63,7 @@ func NewConnection() (*DB, error) {
 	}
 
 	log.Println("Successfully connected to MySQL database")
-	return &DB{db}, nil
+	return db, nil
 }
 
 // Close closes the database connection

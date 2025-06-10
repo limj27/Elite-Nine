@@ -15,7 +15,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./migrations:/docker-entrypoint-initdb.d  # Auto-run SQL files on startup
+      - ./db:/docker-entrypoint-initdb.d  # Auto-run SQL files on startup
     deploy:
       resources:
         limits:

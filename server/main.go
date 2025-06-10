@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"trivia-server/db"
 	"trivia-server/handlers"
 
 	"github.com/gorilla/mux"
@@ -15,10 +16,19 @@ const (
 
 func main() {
 	r := mux.NewRouter()
+	database, err := db.NewConnection()
+	if err != nil {
+		log.Fatalf("Error connecting to database: %v", err)
+	}
 
 	//WebSocket Endpoint for handling multiplayer game connections
-	r.HandleFunc("/ws", handlers.WsHandler)
+	// r.HandleFunc("/ws", handlers.WsHandler
 
-	fmt.Println("Server running on port %s ...", port)
+	// Handling team routes
+	teamRepo := db.NewTeamRepository(database)
+	teamHandler := handlers.NewTeamHandler(teamRepo)
+	teamHandler.RegisterTeamRoutes(r)
+
+	fmt.Printf("Server running on port %s ...", port)
 	log.Fatal(http.ListenAndServe(port, r))
 }
