@@ -1,4 +1,4 @@
-Baseball Trivia Multiplayer Game
+Elite Nine
 
 * Client
 - Simple web UI for now but want to add mobile functionality (iOS & Android)
