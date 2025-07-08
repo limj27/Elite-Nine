@@ -6,7 +6,6 @@ import (
 	"trivia-server/models"
 
 	"github.com/go-redis/redis"
-	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,12 +23,6 @@ type LoginRequest struct {
 type AuthResponse struct {
 	Token string      `json:"token"`
 	User  models.User `json:"user"`
-}
-
-type Claims struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	jwt.RegisteredClaims
 }
 
 type UserService struct {
