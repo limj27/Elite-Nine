@@ -1,12 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
-	"trivia-server/db"
+	"os"
 	"trivia-server/handlers"
+	"trivia-server/sessions"
 
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 )
 
@@ -15,20 +17,42 @@ const (
 )
 
 func main() {
-	r := mux.NewRouter()
-	database, err := db.NewConnection()
+	// Database connection
+	db, err := sql.Open("mysql", os.Getenv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("Error connecting to database: %v", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
+	defer db.Close()
 
-	//WebSocket Endpoint for handling multiplayer game connections
-	// r.HandleFunc("/ws", handlers.WsHandler
+	// Redis connection
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDR"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
 
-	// Handling team routes
-	teamRepo := db.NewTeamRepository(database)
-	teamHandler := handlers.NewTeamHandler(teamRepo)
-	teamHandler.RegisterTeamRoutes(r)
+	// Services
+	userService := sessions.NewUserService(db, redisClient)
+	jwtService := sessions.NewJWTService(os.Getenv("JWT_SECRET"), redisClient)
+	userHandler := handlers.NewUserHandler(userService, jwtService)
 
-	fmt.Printf("Server running on port %s ...", port)
-	log.Fatal(http.ListenAndServe(port, r))
+	// Router
+	router := mux.NewRouter()
+	SetupUserRoutes(router, userHandler, jwtService)
+
+	// Start server
+	log.Println("Server starting on :8080")
+	log.Fatal(http.ListenAndServe(":8080", router))
+}
+
+func SetupUserRoutes(router *mux.Router, userHandler *handlers.UserHandler, jwtService *sessions.JWTService) {
+	// Public routes
+	router.HandleFunc("/register", userHandler.Register).Methods("POST")
+	router.HandleFunc("/login", userHandler.Login).Methods("POST")
+
+	// Protected routes
+	protected := router.PathPrefix("/api").Subrouter()
+	protected.Use(sessions.AuthMiddleware(jwtService))
+	protected.HandleFunc("/profile", userHandler.GetProfile).Methods("GET")
+	protected.HandleFunc("/logout", userHandler.Logout).Methods("POST")
 }
