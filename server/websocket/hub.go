@@ -49,7 +49,7 @@ func (h *Hub) Run() {
 			}
 			client.send <- welcomeMsg.ToJSON()
 
-		case client <- h.unregister:
+		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
@@ -77,12 +77,12 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 	defer h.mu.Unlock()
 
 	for roomID, room := range h.rooms {
-		if room.RemovePlayer(client.id) {
+		if room.RemovePlayer(client.ID) {
 			leaveMsg := Message{
 				Type: "player_left",
 				Data: map[string]interface{}{
 					"roomId":   roomID,
-					"playerId": client.id,
+					"playerId": client.ID,
 				},
 			}
 			room.Broadcast(leaveMsg.ToJSON())

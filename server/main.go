@@ -7,6 +7,7 @@ import (
 	"os"
 	"trivia-server/handlers"
 	"trivia-server/sessions"
+	"trivia-server/websocket"
 
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
@@ -15,6 +16,12 @@ import (
 const (
 	port = ":8080" // Port for the server to listen on
 )
+
+func setupWebSocket() *websocket.Hub {
+	hub := websocket.NewHub()
+	go hub.Run() // Start the WebSocket hub in a goroutine
+	return hub
+}
 
 func main() {
 	// Database connection
@@ -39,6 +46,10 @@ func main() {
 	// Router
 	router := mux.NewRouter()
 	SetupUserRoutes(router, userHandler, jwtService)
+
+	// WebSocket Hub
+	wsHub := setupWebSocket()
+	http.HandleFunc("/ws", websocket.Handler(wsHub))
 
 	// Start server
 	log.Println("Server starting on :8080")

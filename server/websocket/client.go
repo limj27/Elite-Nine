@@ -230,15 +230,15 @@ func (c *Client) handleLeaveRoom(msg Message) {
 		return
 	}
 
-	room.RemovePlayer(c.ID) 
+	room.RemovePlayer(c.ID)
 }
 
 func (c *Client) handlePing() {
-	response := Message[
+	response := Message{
 		Type: "pong",
 		Data: map[string]interface{}{
 			"timestamp": time.Now().Unix(),
 		},
-	]
+	}
 	c.send <- response.ToJSON()
 }
