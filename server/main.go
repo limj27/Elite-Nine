@@ -49,7 +49,7 @@ func main() {
 
 	// WebSocket Hub
 	wsHub := setupWebSocket()
-	http.HandleFunc("/ws", websocket.Handler(wsHub))
+	http.HandleFunc("/ws", websocket.Handler(wsHub, jwtService))
 
 	// Start server
 	log.Println("Server starting on :8080")

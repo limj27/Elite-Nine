@@ -35,20 +35,22 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	hub    *Hub
-	conn   *websocket.Conn
-	send   chan []byte
-	ID     string
-	userID string
+	hub      *Hub
+	conn     *websocket.Conn
+	send     chan []byte
+	ID       string
+	userID   string //From JWT Token
+	username string //From JWT Token
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, userID string, username string) *Client {
 	return &Client{
-		hub:    hub,
-		conn:   conn,
-		send:   make(chan []byte, 256), // Buffered channel to prevent blocking
-		ID:     uuid.New().String(),    // Use remote address as client ID
-		userID: userID,
+		hub:      hub,
+		conn:     conn,
+		send:     make(chan []byte, 256), // Buffered channel to prevent blocking
+		ID:       uuid.New().String(),    // Use remote address as client ID
+		userID:   userID,
+		username: username,
 	}
 }
 
@@ -70,13 +72,13 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("Error reading message from client %s: %v", c.ID, err)
+				log.Printf("error: %v", err)
 			}
 			break
 		}
 
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.handleMesasage(message)
+		c.handleMessage(message)
 	}
 }
 
@@ -122,7 +124,7 @@ func (c *Client) writePump() {
 }
 
 // handleMesasage processes incoming messages from the client.
-func (c *Client) handleMesasage(data []byte) {
+func (c *Client) handleMessage(data []byte) {
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
 		log.Printf("Error unmarshalling message from client %s: %v", c.ID, err)
