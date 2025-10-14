@@ -34,6 +34,8 @@ type GridConfig struct {
 
 // GridCell represents one cell in the grid
 type GridCell struct {
+	Row         int    `json:"row"`
+	Col         int    `json:"col"`
 	RowCategory string `json:"row_category"`
 	ColCategory string `json:"col_category"`
 	Criteria    string `json:"criteria"`
