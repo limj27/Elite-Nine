@@ -49,7 +49,10 @@ func main() {
 
 	// WebSocket Hub
 	wsHub := setupWebSocket()
-	http.HandleFunc("/ws", websocket.Handler(wsHub, jwtService))
+
+	// Create GameManager and pass into handler along with JWT service
+	gm := websocket.NewGameManager()
+	http.HandleFunc("/ws", websocket.Handler(wsHub, jwtService, gm))
 
 	// Start server
 	log.Println("Server starting on :8080")

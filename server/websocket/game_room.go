@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"time"
+	"trivia-server/models"
 )
 
 var (
@@ -19,6 +20,10 @@ type GameRoom struct {
 	State     GameState
 	CreatedAt time.Time
 	mu        sync.RWMutex
+
+	GameModel   *models.GameState
+	GameID      int
+	GameManager *GameManager
 }
 
 type GameState struct {
@@ -66,7 +71,39 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 		},
 	}
 	r.Broadcast(joinMsg.ToJSON())
+
+	if r.State.PlayerCount == r.State.MaxPlayers {
+		r.State.Status = "ready"
+		readyMsg := Message{
+			Type: "room_ready",
+			Data: map[string]interface{}{
+				"roomId": r.ID,
+			},
+		}
+		r.Broadcast(readyMsg.ToJSON())
+	}
+
 	return nil
+}
+
+func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameManager) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.GameModel = gameState
+	r.GameID = gameID
+	r.GameManager = gm
+	r.State.Status = "active"
+
+	startMsg := Message{
+		Type: "game_started",
+		Data: map[string]interface{}{
+			"roomId": r.ID,
+			"gameId": r.GameID,
+			"state":  r.GameModel,
+		},
+	}
+	r.Broadcast(startMsg.ToJSON())
 }
 
 func (r *GameRoom) RemovePlayer(clientID string) bool {

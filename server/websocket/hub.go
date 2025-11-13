@@ -112,6 +112,16 @@ func (h *Hub) CreateRoom(roomID string, creatorID string) *GameRoom {
 	return room
 }
 
+func (h *Hub) AddRoom(room *GameRoom) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, exists := h.rooms[room.ID]; exists {
+		log.Printf("Room %s already exists", room.ID)
+	}
+	h.rooms[room.ID] = room
+	log.Printf("Room %s added", room.ID)
+}
+
 // JoinRoom adds a player to a game room
 func (h *Hub) JoinRoom(roomID string, client *Client) error {
 	h.mu.RLock()

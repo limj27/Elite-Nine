@@ -9,7 +9,7 @@ import (
 	"trivia-server/sessions"
 )
 
-func Handler(hub *Hub, jwtService *sessions.JWTService) http.HandlerFunc {
+func Handler(hub *Hub, jwtService *sessions.JWTService, gm *GameManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, username, err := getUserIDFromToken(r, jwtService) // Implement this function to extract user ID from token
 		if userID == "" {
@@ -24,7 +24,7 @@ func Handler(hub *Hub, jwtService *sessions.JWTService) http.HandlerFunc {
 			return
 		}
 
-		client := NewClient(hub, conn, userID, username)
+		client := NewClient(hub, conn, userID, username, gm)
 		client.hub.register <- client
 
 		// allow connection of memory referenced by the caller by doing all work in goroutines
