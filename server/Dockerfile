@@ -7,7 +7,7 @@ ENV GOOS=linux
 ENV GOARCH=arm64
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+RUN apk add --no-cache gcc musl-dev
 
 # Create app directory
 WORKDIR /app
@@ -19,12 +19,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy source code
-COPY cmd/ ./cmd/
-COPY internal/ ./internal/
-COPY pkg/ ./pkg/
+COPY . .
 
-# Build the application
-RUN go build -ldflags="-w -s" -o main ./cmd/server
+# Build the application from server main package
+RUN go build -ldflags="-w -s" -o main .
 
 # Final stage - minimal runtime image
 FROM alpine:latest

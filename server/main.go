@@ -13,10 +13,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	port = ":8080" // Port for the server to listen on
-)
-
 func setupWebSocket() *websocket.Hub {
 	hub := websocket.NewHub()
 	go hub.Run() // Start the WebSocket hub in a goroutine
@@ -24,6 +20,10 @@ func setupWebSocket() *websocket.Hub {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	// Database connection
 	db, err := sql.Open("mysql", os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -52,11 +52,14 @@ func main() {
 
 	// Create GameManager and pass into handler along with JWT service
 	gm := websocket.NewGameManager()
-	http.HandleFunc("/ws", websocket.Handler(wsHub, jwtService, gm))
+	router.HandleFunc("/ws", websocket.Handler(wsHub, jwtService, gm))
+
+	// Optional: Serve frontend assets for local test
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("../client/")))
 
 	// Start server
-	log.Println("Server starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Printf("Server starting on :%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
 func SetupUserRoutes(router *mux.Router, userHandler *handlers.UserHandler, jwtService *sessions.JWTService) {

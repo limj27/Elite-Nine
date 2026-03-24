@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 	"trivia-server/game"
 	"trivia-server/models"
@@ -44,11 +45,16 @@ type wsMessage struct {
 }
 
 type createRoomPayload struct {
-	MaxPlayers int `json:"max_Players"`
+	RoomID     string `json:"room_id,omitempty"`
+	RoomName   string `json:"room_name,omitempty"`
+	Password   string `json:"password,omitempty"`
+	MaxPlayers int    `json:"max_Players"`
 }
 
 type joinRoomPayload struct {
-	RoomID string `json:"room_id"`
+	RoomID   string `json:"room_id,omitempty"`
+	RoomName string `json:"room_name,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 type makeMovePayload struct {
@@ -87,20 +93,8 @@ func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
+		c.hub.removeClientFromRooms(c)
 
-		if c.currentRoom != "" {
-			if room, exists := c.hub.GetRoom(c.currentRoom); exists {
-				room.RemovePlayer(c.ID)
-				leaveMsg := Message{
-					Type: "player_left",
-					Data: map[string]interface{}{
-						"playerId": c.ID,
-						"roomId":   c.currentRoom,
-					},
-				}
-				room.Broadcast(leaveMsg.ToJSON())
-			}
-		}
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
@@ -192,6 +186,12 @@ func (c *Client) handleMessage(msg wsMessage) {
 			c.sendError("invalid join_room payload")
 			return
 		}
+		p.RoomID = strings.TrimSpace(p.RoomID)
+		p.RoomName = strings.TrimSpace(p.RoomName)
+		if p.RoomID == "" && p.RoomName == "" {
+			c.sendError("room_id or room_name is required")
+			return
+		}
 		c.handleJoinRoom(p)
 	case "start_game":
 		c.handleStartGame()
@@ -202,6 +202,10 @@ func (c *Client) handleMessage(msg wsMessage) {
 			return
 		}
 		c.handleMakeMove(p)
+	case "list_rooms":
+		rooms := c.hub.ListRooms()
+		log.Printf("list_rooms request %d rooms", len(rooms))
+		c.sendJSON(map[string]interface{}{"type": "rooms_list", "payload": map[string]interface{}{"rooms": rooms}})
 	case "leave_room":
 		c.handleLeaveRoom()
 	default:
@@ -230,8 +234,34 @@ func (c *Client) sendError(msg string) {
 
 // handleCreateRoom handles the creation of a new game room.
 func (c *Client) handleCreateRoom(p createRoomPayload) {
-	roomID := uuid.New().String()
-	room := NewGameRoom(roomID, c.userID)
+	requestedRoomID := strings.TrimSpace(p.RoomID)
+	if requestedRoomID == "" {
+		requestedRoomID = uuid.New().String()
+	}
+
+	roomName := strings.TrimSpace(p.RoomName)
+	roomPassword := strings.TrimSpace(p.Password)
+
+	if roomName == "" {
+		c.sendError("room_name is required")
+		return
+	}
+
+	if _, exists := c.hub.GetRoom(requestedRoomID); exists {
+		c.sendError("room ID already exists")
+		return
+	}
+
+	if existingRoom, nameExists := c.hub.GetRoomByName(roomName); nameExists && existingRoom.ID != requestedRoomID {
+		c.sendError("room name already exists")
+		return
+	}
+
+	if p.MaxPlayers <= 0 {
+		p.MaxPlayers = 2
+	}
+
+	room := NewGameRoom(requestedRoomID, roomName, roomPassword, c.userID)
 	room.State.MaxPlayers = p.MaxPlayers
 
 	c.hub.AddRoom(room)
@@ -239,27 +269,65 @@ func (c *Client) handleCreateRoom(p createRoomPayload) {
 		c.sendError(fmt.Sprintf("failed to join created room: %v", err))
 		return
 	}
-	c.currentRoom = roomID
+	c.currentRoom = requestedRoomID
 	c.sendJSON(map[string]interface{}{
-		"type":    "room_created",
-		"payload": map[string]interface{}{"room_id": roomID}})
+		"type": "room_created",
+		"payload": map[string]interface{}{
+			"room_id":   requestedRoomID,
+			"room_name": roomName,
+		},
+	})
+	c.sendJSON(map[string]interface{}{
+		"type": "joined_room",
+		"payload": map[string]interface{}{
+			"room_id":   requestedRoomID,
+			"room_name": roomName,
+		},
+	})
+
+	// Announce newly created room to all connected clients and refresh room lists
+	c.hub.BroadcastRoomList()
 }
 
 // handleJoinRoom handles a client joining an existing game room.
 func (c *Client) handleJoinRoom(p joinRoomPayload) {
-	room, err := c.hub.GetRoom(p.RoomID)
-	if err != true {
+	roomID := strings.TrimSpace(p.RoomID)
+	roomName := strings.TrimSpace(p.RoomName)
+	password := strings.TrimSpace(p.Password)
+
+	var room *GameRoom
+	var exists bool
+
+	if roomID != "" {
+		log.Printf("handleJoinRoom called for client %s by roomId=%s", c.ID, roomID)
+		room, exists = c.hub.GetRoom(roomID)
+	}
+
+	if !exists && roomName != "" {
+		log.Printf("handleJoinRoom called for client %s by roomName=%s", c.ID, roomName)
+		room, exists = c.hub.GetRoomByName(roomName)
+	}
+
+	if !exists {
 		c.sendError("room not found")
 		return
 	}
+
+	if room.Password != "" && room.Password != password {
+		c.sendError("incorrect room password")
+		return
+	}
+
 	if err := room.AddPlayer(c); err != nil {
 		c.sendError(err.Error())
 		return
 	}
-	c.currentRoom = p.RoomID
-	c.sendJSON(map[string]interface{}{"type": "joined_room", "payload": map[string]interface{}{"room_id": p.RoomID}})
-}
 
+	c.currentRoom = room.ID
+	c.sendJSON(map[string]interface{}{"type": "joined_room", "payload": map[string]interface{}{"room_id": room.ID, "room_name": room.Name}})
+	c.hub.BroadcastRoomList()
+	log.Printf("Client %s joined room %s", c.ID, room.ID)
+}
 func (c *Client) handleStartGame() {
 	if c.currentRoom == "" {
 		c.sendError("not in a room")
@@ -272,30 +340,34 @@ func (c *Client) handleStartGame() {
 	}
 
 	players := make([]models.GamePlayer, 0, len(room.Players))
-	for _, cl := range room.Players {
+	for _, cl := range room.GetOrderedClients() {
 		uid, _ := strconv.Atoi(cl.userID)
 		players = append(players, models.GamePlayer{
 			UserID:   uid,
 			Username: cl.username,
-			// other fields left zero-valued
 		})
+	}
+
+	if len(players) < 2 {
+		c.sendError("need 2 players to start")
+		return
 	}
 
 	gameModel := models.Game{
 		Status:      models.GameStatusActive,
 		CurrentTurn: 0,
-		// additional fields zero-valued
 	}
 
-	var gs *models.GameState
-	gs = game.NewGameState(gameModel, players)
+	gs := game.NewGameState(gameModel, players)
 
-	gameID := 0
 	if c.GameManager != nil {
-		gameID = c.GameManager.Create(gs)
+		c.GameManager.Create(gs)
 	}
 
-	room.StartGame(gs, gameID, c.GameManager)
+	room.StartGame(gs, 0, c.GameManager)
+
+	// Broadcast initial game state for both clients explicitly
+	room.Broadcast(mustMarshal(map[string]interface{}{"type": "game_state", "payload": room.GameModel}))
 }
 
 func (c *Client) handleMakeMove(p makeMovePayload) {
@@ -336,11 +408,16 @@ func (c *Client) handleLeaveRoom() {
 		return
 	}
 	room, exists := c.hub.GetRoom(c.currentRoom)
-	if !exists {
+	if exists {
 		room.RemovePlayer(c.ID)
-		room.Broadcast(mustMarshal(map[string]interface{}{"playerId": c.ID}))
+		room.Broadcast(mustMarshal(map[string]interface{}{"type": "player_left", "payload": map[string]interface{}{"playerId": c.ID}}))
 	}
 	c.currentRoom = ""
+	c.hub.BroadcastRoomList()
+}
+
+func (c *Client) Close() {
+	close(c.send)
 }
 
 func mustMarshal(v interface{}) []byte {

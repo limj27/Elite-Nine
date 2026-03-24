@@ -49,6 +49,10 @@ func (h *Hub) Run() {
 			}
 			client.send <- welcomeMsg.ToJSON()
 
+			// Send current room list to newly connected client
+			msg := &Message{Type: "rooms_list", Data: map[string]interface{}{"rooms": h.ListRooms()}}
+			client.send <- msg.ToJSON()
+
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
@@ -93,23 +97,9 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 			}
 		}
 	}
-}
 
-// CreateRoom creates a new game room
-func (h *Hub) CreateRoom(roomID string, creatorID string) *GameRoom {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if _, exists := h.rooms[roomID]; exists {
-		log.Printf("Room %s already exists", roomID)
-		return nil
-	}
-
-	room := NewGameRoom(roomID, creatorID)
-	h.rooms[roomID] = room
-	log.Printf("Room %s created by %s", roomID, creatorID)
-
-	return room
+	// Update room list for all clients when room membership changes
+	h.BroadcastRoomList()
 }
 
 func (h *Hub) AddRoom(room *GameRoom) {
@@ -122,22 +112,84 @@ func (h *Hub) AddRoom(room *GameRoom) {
 	log.Printf("Room %s added", room.ID)
 }
 
-// JoinRoom adds a player to a game room
-func (h *Hub) JoinRoom(roomID string, client *Client) error {
-	h.mu.RLock()
-	room, exists := h.rooms[roomID]
-	h.mu.RUnlock()
-
-	if !exists {
-		return ErrRoomNotFound
-	}
-
-	return room.AddPlayer(client)
+type RoomSummary struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	PlayerCount int    `json:"player_count"`
+	MaxPlayers  int    `json:"max_players"`
+	Status      string `json:"status"`
 }
 
 func (h *Hub) GetRoom(roomID string) (*GameRoom, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	room, exists := h.rooms[roomID]
+	if !exists {
+		log.Printf("GetRoom: room not found: %s, existing rooms: %v", roomID, h.ListRooms())
+	} else {
+		log.Printf("GetRoom: found room %s", roomID)
+	}
 	return room, exists
+}
+
+func (h *Hub) GetRoomByName(name string) (*GameRoom, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, room := range h.rooms {
+		if room.Name == name {
+			return room, true
+		}
+	}
+	return nil, false
+}
+
+func (h *Hub) ListRooms() []RoomSummary {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	rooms := make([]RoomSummary, 0, len(h.rooms))
+	for _, room := range h.rooms {
+		rooms = append(rooms, RoomSummary{
+			ID:          room.ID,
+			Name:        room.Name,
+			PlayerCount: room.State.PlayerCount,
+			MaxPlayers:  room.State.MaxPlayers,
+			Status:      room.State.Status,
+		})
+	}
+	return rooms
+}
+
+func (h *Hub) BroadcastRoomList() {
+	rooms := h.ListRooms()
+	msg := Message{Type: "rooms_list", Data: map[string]interface{}{"rooms": rooms}}
+	h.broadcast <- msg.ToJSON()
+}
+
+func (h *Hub) FindRoomByID(roomID string) (*GameRoom, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	room, ok := h.rooms[roomID]
+	return room, ok
+}
+
+func (h *Hub) FindRoomByName(roomName string) (*GameRoom, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, room := range h.rooms {
+		if room.Name == roomName {
+			return room, true
+		}
+	}
+	return nil, false
+}
+
+func (h *Hub) GetClient(clientID string) (*Client, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.clients {
+		if client.ID == clientID {
+			return client, true
+		}
+	}
+	return nil, false
 }

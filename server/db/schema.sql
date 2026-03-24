@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS teams (
     INDEX idx_league (league)
 );
 
-INSERT INTO teams (name, city, abbreviation, league, division, founded) VALUES
+INSERT INTO teams (name, city, abbreviation, league, division, founded_year) VALUES
 -- American League East
 ('Yankees', 'New York', 'NYY', 'AL', 'East', 1901),
 ('Red Sox', 'Boston', 'BOS', 'AL', 'East', 1901),
@@ -77,7 +77,7 @@ INSERT INTO teams (name, city, abbreviation, league, division, founded) VALUES
 ('Giants', 'San Francisco', 'SF', 'NL', 'West', 1883);
 
 -- Add some historical teams (inactive) for more interesting grid possibilities
-INSERT INTO teams (name, city, abbreviation, league, division, founded, active) VALUES
+INSERT INTO teams (name, city, abbreviation, league, division, founded_year, is_active) VALUES
 ('Expos', 'Montreal', 'MON', 'NL', 'East', 1969, FALSE),
 ('Senators', 'Washington', 'WAS', 'AL', 'East', 1901, FALSE),
 ('Pilots', 'Seattle', 'SEA', 'AL', 'West', 1969, FALSE),

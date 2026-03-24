@@ -11,19 +11,24 @@ var (
 	ErrRoomNotFound = errors.New("room not found")
 	ErrRoomFull     = errors.New("room is full")
 	ErrPlayerExists = errors.New("player already exists in the room")
+	ErrRoomClosed   = errors.New("room is closed")
 )
 
 type GameRoom struct {
-	ID        string
-	CreatorID string
-	Players   map[string]*Client
-	State     GameState
-	CreatedAt time.Time
-	mu        sync.RWMutex
+	ID          string
+	Name        string
+	Password    string
+	CreatorID   string
+	Players     map[string]*Client
+	playerOrder []string
+	State       GameState
+	CreatedAt   time.Time
+	mu          sync.RWMutex
 
 	GameModel   *models.GameState
 	GameID      int
 	GameManager *GameManager
+	GameStatus  string
 }
 
 type GameState struct {
@@ -32,15 +37,18 @@ type GameState struct {
 	MaxPlayers  int    `json:"max_players"`
 }
 
-func NewGameRoom(id, creatorID string) *GameRoom {
+func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 	return &GameRoom{
-		ID:        id,
-		CreatorID: creatorID,
-		Players:   make(map[string]*Client),
+		ID:          id,
+		Name:        name,
+		Password:    password,
+		CreatorID:   creatorID,
+		Players:     make(map[string]*Client),
+		playerOrder: make([]string, 0),
 		State: GameState{
 			Status:      "waiting",
 			PlayerCount: 0,
-			MaxPlayers:  2, // Example max players
+			MaxPlayers:  2, // default
 		},
 		CreatedAt: time.Now(),
 	}
@@ -59,6 +67,7 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 	}
 
 	r.Players[client.ID] = client
+	r.playerOrder = append(r.playerOrder, client.ID)
 	r.State.PlayerCount = len(r.Players)
 
 	joinMsg := Message{
@@ -94,6 +103,7 @@ func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameMa
 	r.GameID = gameID
 	r.GameManager = gm
 	r.State.Status = "active"
+	r.GameStatus = "active" // Set game status
 
 	startMsg := Message{
 		Type: "game_started",
@@ -104,6 +114,8 @@ func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameMa
 		},
 	}
 	r.Broadcast(startMsg.ToJSON())
+
+	r.GameManager.AddGameRoom(r.GameID, r) // Add game room to game manager
 }
 
 func (r *GameRoom) RemovePlayer(clientID string) bool {
@@ -116,6 +128,27 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 
 	delete(r.Players, clientID)
 	r.State.PlayerCount = len(r.Players)
+
+	for i, id := range r.playerOrder {
+		if id == clientID {
+			r.playerOrder = append(r.playerOrder[:i], r.playerOrder[i+1:]...)
+			break
+		}
+	}
+
+	leaveMsg := Message{
+		Type: "player_left",
+		Data: map[string]interface{}{
+			"roomId":      r.ID,
+			"playerId":    clientID,
+			"playerCount": r.State.PlayerCount,
+		},
+	}
+	r.Broadcast(leaveMsg.ToJSON())
+
+	if r.State.PlayerCount == 0 {
+		r.Close()
+	}
 
 	return true
 }
@@ -133,14 +166,34 @@ func (r *GameRoom) Broadcast(message []byte) {
 	}
 }
 
-func (r *GameRoom) GetPlayers() []string {
+func (r *GameRoom) GetOrderedClients() []*Client {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	players := make([]string, 0, len(r.Players))
-	for id := range r.Players {
-		players = append(players, id)
+	ordered := make([]*Client, 0, len(r.playerOrder))
+	for _, id := range r.playerOrder {
+		if client, ok := r.Players[id]; ok {
+			ordered = append(ordered, client)
+		}
 	}
+	return ordered
+}
 
-	return players
+func (r *GameRoom) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.State.Status = "closed"
+
+	closeMsg := Message{
+		Type: "room_closed",
+		Data: map[string]interface{}{
+			"roomId": r.ID,
+		},
+	}
+	r.Broadcast(closeMsg.ToJSON())
+
+	// Disconnect all players
+	for _, client := range r.Players {
+		client.Close()
+	}
 }
