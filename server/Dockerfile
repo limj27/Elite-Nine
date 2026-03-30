@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile optimized for Raspberry Pi ARM64
-FROM golang:1.21-alpine AS builder
+FROM golang:alpine AS builder
 
 # Set necessary environment variables
 ENV CGO_ENABLED=1

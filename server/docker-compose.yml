@@ -11,8 +11,6 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-baseball_game}
       MYSQL_USER: ${MYSQL_USER:-gameuser}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gamepassword}
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d  # Auto-run SQL files on startup
@@ -35,8 +33,6 @@ services:
     image: redis:7-alpine
     platform: linux/arm64/v8
     container_name: baseball_redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
