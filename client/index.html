@@ -1,51 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Client</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WS Tic Tac Toe Quick Test</title>
+  <style>
+    body{font-family:system-ui, sans-serif;background:#f4f7ff;color:#111;margin:16px}
+    input, button{margin:4px;padding:8px;}
+    #log{border:1px solid #cdd7f2; background:#fff; height:220px; overflow:auto; padding:8px; white-space:pre-wrap;}
+  </style>
 </head>
 <body>
-<h1>WebSocket Client</h1>
-<div>
-    <input type="text" id="messageInput" placeholder="Enter your message">
-    <button onclick="sendMessage()">Send</button>
-</div>
-<div id="messages"></div>
+  <h1>WebSocket Room Smoke Test</h1>
+  <p>Sign up or log in first. Then your token is used to connect and access rooms.</p>
+  <div>
+    <label>Username <input id="username" value="user1"></label>
+    <label>Password <input type="password" id="password" value="password"></label>
+    <label>Email <input id="email" value="user1@example.com" type="email"></label>
+    <button id="btnLogin">Login & auto-connect</button>
+    <button id="btnSignUp">Sign up & auto-connect</button>
+  </div>
+  <div style="margin-top:8px">
+    <label>Token <input id="token" style="width:420px;"></label>
+    <button id="btnConnect">Connect with token</button>
+  </div>
 
-<script>
+  <div style="margin-top:8px">
+    <label>Room name <input id="roomName" value="roomA"></label>
+    <label>Room password <input id="roomPassword"></label>
+    <button id="btnCreate" disabled>Create room</button>
+    <button id="btnJoin" disabled>Join room</button>
+    <button id="btnList" disabled>List rooms</button>
+  </div>
+
+  <div id="rooms" style="margin-top:8px;"></div>
+  <div id="log"></div>
+
+  <script>
     let ws;
 
-    function connect() {
-        ws = new WebSocket("ws://localhost:8080/ws");
+    const log = (m)=>{document.getElementById('log').textContent += `${new Date().toISOString()} - ${m}\n`;};
+    const renderRooms = (rooms)=>{
+      const root=document.getElementById('rooms');
+      if(!Array.isArray(rooms)||rooms.length===0){root.innerHTML='<p>No rooms available</p>';return;}
+      root.innerHTML=rooms.map(r=>`<div style='margin:4px 0;padding:6px;border:1px solid #cbd8f5;border-radius:8px;background:#fff'><strong>${r.name||r.room_name||r.id}</strong> (${r.id||r.room_id}) - ${r.player_count||r.playerCount||0}/${r.max_players||r.maxPlayers||2} - ${r.status||'waiting'}</div>`).join('');
+    };
 
-        ws.onopen = function() {
-            console.log("Connected to WebSocket server");
-        };
+    const setButtons = (connected)=>{
+      document.getElementById('btnCreate').disabled = !connected;
+      document.getElementById('btnJoin').disabled = !connected;
+      document.getElementById('btnList').disabled = !connected;
+    };
 
-        ws.onmessage = function(event) {
-            let messageDisplay = document.getElementById("messages");
-            messageDisplay.innerHTML += `<p>${event.data}</p>`;
-        };
+    const wsConnect = (token) => {
+      if (!token) {
+        log('Cannot connect: missing token');
+        return;
+      }
+      const addr = `ws://${window.location.hostname}:8080/ws?token=${encodeURIComponent(token)}`;
+      ws = new WebSocket(addr);
+      ws.onopen = ()=>{log('connected to ' + addr); setButtons(true);};
+      ws.onclose = ()=>{log('disconnected'); setButtons(false);};
+      ws.onerror = (e)=>{log('error '+JSON.stringify(e));};
+      ws.onmessage = (e)=>{
+        log('recv raw '+e.data);
+        try {
+          const msg = JSON.parse(e.data);
+          log('recv type '+msg.type);
+          if (msg.type === 'rooms_list') {
+            const rooms = msg.payload?.rooms || [];
+            renderRooms(rooms);
+            log('rooms_list received: ' + rooms.length);
+          } else if (msg.type === 'new_room') {
+            log('new_room: '+(msg.payload?.room_name || msg.payload?.room_id));
+            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
+          } else if (msg.type === 'room_created') {
+            log('room created: '+(msg.payload?.room_name || msg.payload?.room_id));
+            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
+          } else if (msg.type === 'joined_room') {
+            log('joined room: '+(msg.payload?.room_name || msg.payload?.room_id));
+            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
+          }
+        } catch (err) {
+          log('json parse error: '+err);
+        }
+      };
+    };
 
-        ws.onclose = function() {
-            console.log("WebSocket connection closed, retrying...");
-            setTimeout(connect, 1000); // Reconnect after 1 second
-        };
+    const authenticateAndConnect = async (route) => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const email = document.getElementById('email').value.trim();
+      if (!username || !password) {
+        return log('username and password are required');
+      }
+      if (route === '/register' && !email) {
+        return log('email is required for sign up');
+      }
 
-        ws.onerror = function(error) {
-            console.error("WebSocket error:", error);
-        };
-    }
+      try {
+        const payload = {username, password};
+        if (route === '/register') payload.email = email;
 
-    function sendMessage() {
-        let input = document.getElementById("messageInput");
-        let message = input.value;
-        ws.send(message);
-        input.value = "";
-    }
+        const resp = await fetch(route, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          log(`${route} failed: ${resp.status} ${text}`);
+          return;
+        }
 
-    connect();
-</script>
+        const body = await resp.json();
+        const token = body.token;
+        if (!token) {
+          log(`${route} did not return token`);
+          return;
+        }
+
+        document.getElementById('token').value = token;
+        localStorage.setItem('ws_token', token);
+        log(`${route} success, connecting websocket`);
+        wsConnect(token);
+      } catch (err) {
+        log(`${route} error: ${err}`);
+      }
+    };
+
+    document.getElementById('btnLogin').onclick = ()=>authenticateAndConnect('/login');
+    document.getElementById('btnSignUp').onclick = ()=>authenticateAndConnect('/register');
+
+    document.getElementById('btnConnect').onclick = ()=>{
+      const token = document.getElementById('token').value.trim() || localStorage.getItem('ws_token');
+      if (!token) {
+        log('token is required to connect');
+        return;
+      }
+      wsConnect(token);
+    };
+
+    document.getElementById('btnCreate').onclick = ()=>{
+      if(!ws || ws.readyState!==WebSocket.OPEN){return log('ws not open');}
+      const roomName = document.getElementById('roomName').value.trim() || 'roomA';
+      const pass = document.getElementById('roomPassword').value;
+      ws.send(JSON.stringify({type:'create_room',payload:{room_name:roomName,password:pass,max_Players:2}}));
+      log('sent create_room');
+    };
+
+    document.getElementById('btnJoin').onclick = ()=>{
+      if(!ws||ws.readyState!==WebSocket.OPEN){return log('ws not open');}
+      const roomName = document.getElementById('roomName').value.trim() || 'roomA';
+      const pass = document.getElementById('roomPassword').value;
+      ws.send(JSON.stringify({type:'join_room',payload:{room_name:roomName,password:pass}}));
+      log('sent join_room');
+    };
+
+    document.getElementById('btnList').onclick = ()=>{
+      if(!ws||ws.readyState!==WebSocket.OPEN){return log('ws not open');}
+      ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
+      log('sent list_rooms');
+    };
+  </script>
 </body>
 </html>
