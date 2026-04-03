@@ -77,29 +77,42 @@ func (h *Hub) Run() {
 
 // removeClientFromRooms removes a client from all game rooms they are part of.
 func (h *Hub) removeClientFromRooms(client *Client) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	roomsToCheck := make([]*GameRoom, 0, len(h.rooms))
+	for _, room := range h.rooms {
+		roomsToCheck = append(roomsToCheck, room)
+	}
+	h.mu.RUnlock()
 
-	for roomID, room := range h.rooms {
+	emptyRooms := make([]string, 0)
+	for _, room := range roomsToCheck {
 		if room.RemovePlayer(client.ID) {
 			leaveMsg := Message{
 				Type: "player_left",
 				Data: map[string]interface{}{
-					"roomId":   roomID,
+					"roomId":   room.ID,
 					"playerId": client.ID,
 				},
 			}
 			room.Broadcast(leaveMsg.ToJSON())
 
+			room.mu.RLock()
 			if len(room.Players) == 0 {
-				delete(h.rooms, roomID)
-				log.Printf("Room %s removed due to no players", roomID)
+				emptyRooms = append(emptyRooms, room.ID)
 			}
+			room.mu.RUnlock()
 		}
 	}
 
-	// Update room list for all clients when room membership changes
-	h.BroadcastRoomList()
+	// Remove empty rooms with hub lock
+	if len(emptyRooms) > 0 {
+		h.mu.Lock()
+		for _, roomID := range emptyRooms {
+			delete(h.rooms, roomID)
+			log.Printf("Room %s removed due to no players", roomID)
+		}
+		h.mu.Unlock()
+	}
 }
 
 func (h *Hub) AddRoom(room *GameRoom) {

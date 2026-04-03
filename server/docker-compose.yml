@@ -103,3 +103,5 @@ volumes:
 networks:
   baseball_network:
     driver: bridge
+  shared_proxy:
+    external: true
