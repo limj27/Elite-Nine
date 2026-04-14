@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"trivia-server/models"
@@ -55,6 +56,7 @@ func (uh *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		log.Printf("Error creating user: %v", err)
 		return
 	}
 

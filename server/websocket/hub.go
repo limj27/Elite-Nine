@@ -42,7 +42,7 @@ func (h *Hub) Run() {
 			//Send welcome message
 			welcomeMsg := Message{
 				Type: "connected",
-				Data: map[string]interface{}{
+				Payload: map[string]interface{}{
 					"message":  "Connected to server",
 					"clientId": client.ID,
 				},
@@ -50,7 +50,7 @@ func (h *Hub) Run() {
 			client.send <- welcomeMsg.ToJSON()
 
 			// Send current room list to newly connected client
-			msg := &Message{Type: "rooms_list", Data: map[string]interface{}{"rooms": h.ListRooms()}}
+			msg := &Message{Type: "rooms_list", Payload: map[string]interface{}{"rooms": h.ListRooms()}}
 			client.send <- msg.ToJSON()
 
 		case client := <-h.unregister:
@@ -89,7 +89,7 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 		if room.RemovePlayer(client.ID) {
 			leaveMsg := Message{
 				Type: "player_left",
-				Data: map[string]interface{}{
+				Payload: map[string]interface{}{
 					"roomId":   room.ID,
 					"playerId": client.ID,
 				},
@@ -174,8 +174,13 @@ func (h *Hub) ListRooms() []RoomSummary {
 
 func (h *Hub) BroadcastRoomList() {
 	rooms := h.ListRooms()
-	msg := Message{Type: "rooms_list", Data: map[string]interface{}{"rooms": rooms}}
-	h.broadcast <- msg.ToJSON()
+	log.Printf("BroadcastRoomList: broadcasting %d rooms", len(rooms))
+	msg := Message{Type: "rooms_list", Payload: map[string]interface{}{"rooms": rooms}}
+	select {
+	case h.broadcast <- msg.ToJSON():
+	default:
+		log.Println("BroadcastRoomList: broadcast channel full, skipping")
+	}
 }
 
 func (h *Hub) FindRoomByID(roomID string) (*GameRoom, bool) {

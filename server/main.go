@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 func setupWebSocket() *websocket.Hub {
@@ -20,6 +21,10 @@ func setupWebSocket() *websocket.Hub {
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system env vars")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

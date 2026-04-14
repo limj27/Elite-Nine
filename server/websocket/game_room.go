@@ -72,7 +72,7 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 
 	joinMsg := Message{
 		Type: "player_joined",
-		Data: map[string]interface{}{
+		Payload: map[string]interface{}{
 			"roomId":      r.ID,
 			"playerId":    client.ID,
 			"playerCount": r.State.PlayerCount,
@@ -85,7 +85,7 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 		r.State.Status = "ready"
 		readyMsg := Message{
 			Type: "room_ready",
-			Data: map[string]interface{}{
+			Payload: map[string]interface{}{
 				"roomId": r.ID,
 			},
 		}
@@ -107,7 +107,7 @@ func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameMa
 
 	startMsg := Message{
 		Type: "game_started",
-		Data: map[string]interface{}{
+		Payload: map[string]interface{}{
 			"roomId": r.ID,
 			"gameId": r.GameID,
 			"state":  r.GameModel,
@@ -138,7 +138,7 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 
 	leaveMsg := Message{
 		Type: "player_left",
-		Data: map[string]interface{}{
+		Payload: map[string]interface{}{
 			"roomId":      r.ID,
 			"playerId":    clientID,
 			"playerCount": r.State.PlayerCount,
@@ -186,7 +186,7 @@ func (r *GameRoom) Close() {
 
 	closeMsg := Message{
 		Type: "room_closed",
-		Data: map[string]interface{}{
+		Payload: map[string]interface{}{
 			"roomId": r.ID,
 		},
 	}
