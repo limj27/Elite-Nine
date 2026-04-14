@@ -62,28 +62,33 @@
       ws.onopen = ()=>{log('connected to ' + addr); setButtons(true);};
       ws.onclose = ()=>{log('disconnected'); setButtons(false);};
       ws.onerror = (e)=>{log('error '+JSON.stringify(e));};
-      ws.onmessage = (e)=>{
-        log('recv raw '+e.data);
-        try {
-          const msg = JSON.parse(e.data);
-          log('recv type '+msg.type);
-          if (msg.type === 'rooms_list') {
-            const rooms = msg.payload?.rooms || [];
-            renderRooms(rooms);
-            log('rooms_list received: ' + rooms.length);
-          } else if (msg.type === 'new_room') {
-            log('new_room: '+(msg.payload?.room_name || msg.payload?.room_id));
-            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
-          } else if (msg.type === 'room_created') {
-            log('room created: '+(msg.payload?.room_name || msg.payload?.room_id));
-            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
-          } else if (msg.type === 'joined_room') {
-            log('joined room: '+(msg.payload?.room_name || msg.payload?.room_id));
-            ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
-          }
-        } catch (err) {
-          log('json parse error: '+err);
-        }
+      ws.onmessage = (e) => {
+        // Split on newline to handle batched messages
+        const rawMessages = e.data.split('\n').filter(s => s.trim() !== '');
+        
+        rawMessages.forEach(raw => {
+            log('recv raw ' + raw);
+            try {
+                const msg = JSON.parse(raw);
+                log('recv type ' + msg.type);
+                if (msg.type === 'rooms_list') {
+                    const rooms = msg.payload?.rooms || [];
+                    renderRooms(rooms);
+                    log('rooms_list received: ' + rooms.length);
+                } else if (msg.type === 'new_room') {
+                    log('new_room: ' + (msg.payload?.room_name || msg.payload?.room_id));
+                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
+                } else if (msg.type === 'room_created') {
+                    log('room created: ' + (msg.payload?.room_name || msg.payload?.room_id));
+                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
+                } else if (msg.type === 'joined_room') {
+                    log('joined room: ' + (msg.payload?.room_name || msg.payload?.room_id));
+                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
+                }
+            } catch (err) {
+                log('json parse error: ' + err);
+            }
+        });
       };
     };
 
