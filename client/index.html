@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WS Tic Tac Toe Quick Test</title>
+  <title>Elite-Nine WS Smoke Test</title>
   <style>
     body{font-family:system-ui, sans-serif;background:#f4f7ff;color:#111;margin:16px}
     input, button{margin:4px;padding:8px;}
-    #log{border:1px solid #cdd7f2; background:#fff; height:220px; overflow:auto; padding:8px; white-space:pre-wrap;}
+    #log{border:1px solid #cdd7f2; background:#fff; height:220px; overflow:auto; padding:8px; white-space:pre-wrap; font-size:12px;}
   </style>
 </head>
 <body>
@@ -39,55 +39,94 @@
   <script>
     let ws;
 
-    const log = (m)=>{document.getElementById('log').textContent += `${new Date().toISOString()} - ${m}\n`;};
-    const renderRooms = (rooms)=>{
-      const root=document.getElementById('rooms');
-      if(!Array.isArray(rooms)||rooms.length===0){root.innerHTML='<p>No rooms available</p>';return;}
-      root.innerHTML=rooms.map(r=>`<div style='margin:4px 0;padding:6px;border:1px solid #cbd8f5;border-radius:8px;background:#fff'><strong>${r.name||r.room_name||r.id}</strong> (${r.id||r.room_id}) - ${r.player_count||r.playerCount||0}/${r.max_players||r.maxPlayers||2} - ${r.status||'waiting'}</div>`).join('');
+    const log = (m) => {
+      const el = document.getElementById('log');
+      el.textContent += `${new Date().toISOString()} - ${m}\n`;
+      el.scrollTop = el.scrollHeight;
     };
 
-    const setButtons = (connected)=>{
+    const renderRooms = (rooms) => {
+      const root = document.getElementById('rooms');
+      if (!Array.isArray(rooms) || rooms.length === 0) {
+        root.innerHTML = '<p>No rooms available</p>';
+        return;
+      }
+      root.innerHTML = rooms.map(r =>
+        `<div style='margin:4px 0;padding:6px;border:1px solid #cbd8f5;border-radius:8px;background:#fff'>
+          <strong>${r.name || r.room_name || r.id}</strong> (${r.id || r.room_id})
+          - ${r.player_count || r.playerCount || 0}/${r.max_players || r.maxPlayers || 2}
+          - ${r.status || 'waiting'}
+        </div>`
+      ).join('');
+    };
+
+    const setButtons = (connected) => {
       document.getElementById('btnCreate').disabled = !connected;
       document.getElementById('btnJoin').disabled = !connected;
       document.getElementById('btnList').disabled = !connected;
     };
 
-    const wsConnect = (token) => {
-      if (!token) {
-        log('Cannot connect: missing token');
-        return;
+    const handleMessage = (msg) => {
+      switch (msg.type) {
+        case 'connected':
+          log('server assigned clientId: ' + msg.payload?.clientId);
+          break;
+
+        case 'rooms_list':
+          // Backend sends rooms_list directly — just render it, don't request again
+          const rooms = msg.payload?.rooms || [];
+          renderRooms(rooms);
+          log('rooms_list received: ' + rooms.length + ' room(s) — ' + JSON.stringify(rooms));
+          break;
+
+        case 'room_created':
+          // Room created confirmed — backend already sends rooms_list after this
+          log('room created: ' + (msg.payload?.room_name || msg.payload?.room_id));
+          break;
+
+        case 'joined_room':
+          // Joined room confirmed — backend already sends rooms_list after this
+          log('joined room: ' + (msg.payload?.room_name || msg.payload?.room_id));
+          break;
+
+        case 'new_room':
+          log('new_room broadcast: ' + (msg.payload?.room_name || msg.payload?.room_id));
+          break;
+
+        case 'player_left':
+          log('player left room: ' + msg.payload?.playerId);
+          break;
+
+        case 'error':
+          log('ERROR from server: ' + (msg.message || msg.payload?.message || JSON.stringify(msg)));
+          break;
+
+        default:
+          log('unhandled type: ' + msg.type);
       }
+    };
+
+    const wsConnect = (token) => {
+      if (!token) { log('Cannot connect: missing token'); return; }
+
       const addr = `ws://${window.location.hostname}:8080/ws?token=${encodeURIComponent(token)}`;
       ws = new WebSocket(addr);
-      ws.onopen = ()=>{log('connected to ' + addr); setButtons(true);};
-      ws.onclose = ()=>{log('disconnected'); setButtons(false);};
-      ws.onerror = (e)=>{log('error '+JSON.stringify(e));};
+
+      ws.onopen = () => { log('connected to ' + addr); setButtons(true); };
+      ws.onclose = () => { log('disconnected'); setButtons(false); };
+      ws.onerror = (e) => { log('ws error: ' + JSON.stringify(e)); };
+
       ws.onmessage = (e) => {
-        // Split on newline to handle batched messages
-        const rawMessages = e.data.split('\n').filter(s => s.trim() !== '');
-        
-        rawMessages.forEach(raw => {
-            log('recv raw ' + raw);
-            try {
-                const msg = JSON.parse(raw);
-                log('recv type ' + msg.type);
-                if (msg.type === 'rooms_list') {
-                    const rooms = msg.payload?.rooms || [];
-                    renderRooms(rooms);
-                    log('rooms_list received: ' + rooms.length);
-                } else if (msg.type === 'new_room') {
-                    log('new_room: ' + (msg.payload?.room_name || msg.payload?.room_id));
-                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
-                } else if (msg.type === 'room_created') {
-                    log('room created: ' + (msg.payload?.room_name || msg.payload?.room_id));
-                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
-                } else if (msg.type === 'joined_room') {
-                    log('joined room: ' + (msg.payload?.room_name || msg.payload?.room_id));
-                    ws.send(JSON.stringify({type: 'list_rooms', payload: {}}));
-                }
-            } catch (err) {
-                log('json parse error: ' + err);
-            }
+        // Backend batches multiple messages into one frame separated by \n
+        const frames = e.data.split('\n').filter(s => s.trim() !== '');
+        frames.forEach(raw => {
+          log('recv raw: ' + raw);
+          try {
+            const msg = JSON.parse(raw);
+            handleMessage(msg);
+          } catch (err) {
+            log('json parse error: ' + err + ' | raw: ' + raw);
+          }
         });
       };
     };
@@ -96,22 +135,20 @@
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
       const email = document.getElementById('email').value.trim();
-      if (!username || !password) {
-        return log('username and password are required');
-      }
-      if (route === '/register' && !email) {
-        return log('email is required for sign up');
-      }
+
+      if (!username || !password) return log('username and password are required');
+      if (route === '/register' && !email) return log('email is required for sign up');
 
       try {
-        const payload = {username, password};
+        const payload = { username, password };
         if (route === '/register') payload.email = email;
 
         const resp = await fetch(route, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+
         if (!resp.ok) {
           const text = await resp.text();
           log(`${route} failed: ${resp.status} ${text}`);
@@ -120,10 +157,7 @@
 
         const body = await resp.json();
         const token = body.token;
-        if (!token) {
-          log(`${route} did not return token`);
-          return;
-        }
+        if (!token) { log(`${route} did not return token`); return; }
 
         document.getElementById('token').value = token;
         localStorage.setItem('ws_token', token);
@@ -134,37 +168,34 @@
       }
     };
 
-    document.getElementById('btnLogin').onclick = ()=>authenticateAndConnect('/login');
-    document.getElementById('btnSignUp').onclick = ()=>authenticateAndConnect('/register');
+    document.getElementById('btnLogin').onclick = () => authenticateAndConnect('/login');
+    document.getElementById('btnSignUp').onclick = () => authenticateAndConnect('/register');
 
-    document.getElementById('btnConnect').onclick = ()=>{
+    document.getElementById('btnConnect').onclick = () => {
       const token = document.getElementById('token').value.trim() || localStorage.getItem('ws_token');
-      if (!token) {
-        log('token is required to connect');
-        return;
-      }
+      if (!token) { log('token is required to connect'); return; }
       wsConnect(token);
     };
 
-    document.getElementById('btnCreate').onclick = ()=>{
-      if(!ws || ws.readyState!==WebSocket.OPEN){return log('ws not open');}
+    document.getElementById('btnCreate').onclick = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
       const roomName = document.getElementById('roomName').value.trim() || 'roomA';
       const pass = document.getElementById('roomPassword').value;
-      ws.send(JSON.stringify({type:'create_room',payload:{room_name:roomName,password:pass,max_Players:2}}));
-      log('sent create_room');
+      ws.send(JSON.stringify({ type: 'create_room', payload: { room_name: roomName, password: pass, max_players: 2 } }));
+      log('sent create_room: ' + roomName);
     };
 
-    document.getElementById('btnJoin').onclick = ()=>{
-      if(!ws||ws.readyState!==WebSocket.OPEN){return log('ws not open');}
+    document.getElementById('btnJoin').onclick = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
       const roomName = document.getElementById('roomName').value.trim() || 'roomA';
       const pass = document.getElementById('roomPassword').value;
-      ws.send(JSON.stringify({type:'join_room',payload:{room_name:roomName,password:pass}}));
-      log('sent join_room');
+      ws.send(JSON.stringify({ type: 'join_room', payload: { room_name: roomName, password: pass } }));
+      log('sent join_room: ' + roomName);
     };
 
-    document.getElementById('btnList').onclick = ()=>{
-      if(!ws||ws.readyState!==WebSocket.OPEN){return log('ws not open');}
-      ws.send(JSON.stringify({type:'list_rooms',payload:{}}));
+    document.getElementById('btnList').onclick = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
+      ws.send(JSON.stringify({ type: 'list_rooms', payload: {} }));
       log('sent list_rooms');
     };
   </script>

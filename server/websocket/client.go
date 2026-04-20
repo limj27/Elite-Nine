@@ -216,12 +216,15 @@ func (c *Client) handleMessage(msg wsMessage) {
 func (c *Client) sendJSON(data interface{}) {
 	bytes, err := json.Marshal(data)
 	if err != nil {
+		log.Printf("sendJSON marshal error: %v", err)
 		return
 	}
+	log.Printf("sendJSON queuing message type for client %s: %s", c.ID, string(bytes))
 	select {
 	case c.send <- bytes:
+		log.Printf("sendJSON queued successfully")
 	default:
-		// drop if send buffer full
+		log.Printf("sendJSON DROPPED - send buffer full for client %s", c.ID)
 	}
 }
 
@@ -285,8 +288,14 @@ func (c *Client) handleCreateRoom(p createRoomPayload) {
 		},
 	})
 
-	// Announce newly created room to all connected clients and refresh room lists
-	c.hub.BroadcastRoomList()
+	rooms := c.hub.ListRooms()
+	log.Printf("handleCreateRoom: sending rooms_list with %d rooms", len(rooms))
+	c.sendJSON(map[string]interface{}{
+		"type": "rooms_list",
+		"payload": map[string]interface{}{
+			"rooms": rooms,
+		},
+	})
 }
 
 // handleJoinRoom handles a client joining an existing game room.

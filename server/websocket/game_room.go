@@ -56,19 +56,26 @@ func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 
 func (r *GameRoom) AddPlayer(client *Client) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if len(r.Players) >= r.State.MaxPlayers {
+		r.mu.Unlock()
 		return ErrRoomFull
 	}
 
 	if _, exists := r.Players[client.ID]; exists {
+		r.mu.Unlock()
 		return ErrPlayerExists
 	}
 
 	r.Players[client.ID] = client
 	r.playerOrder = append(r.playerOrder, client.ID)
 	r.State.PlayerCount = len(r.Players)
+	isFull := r.State.PlayerCount == r.State.MaxPlayers
+	if isFull {
+		r.State.Status = "ready"
+	}
+
+	r.mu.Unlock() // release BEFORE broadcasting
 
 	joinMsg := Message{
 		Type: "player_joined",
@@ -81,8 +88,7 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 	}
 	r.Broadcast(joinMsg.ToJSON())
 
-	if r.State.PlayerCount == r.State.MaxPlayers {
-		r.State.Status = "ready"
+	if isFull {
 		readyMsg := Message{
 			Type: "room_ready",
 			Payload: map[string]interface{}{
