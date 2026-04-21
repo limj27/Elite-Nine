@@ -237,6 +237,21 @@ func (c *Client) sendError(msg string) {
 
 // handleCreateRoom handles the creation of a new game room.
 func (c *Client) handleCreateRoom(p createRoomPayload) {
+	// If client is already in a room, remove them from that room first
+	if c.currentRoom != "" {
+		if existingRoom, exists := c.hub.GetRoom(c.currentRoom); exists {
+			existingRoom.RemovePlayer(c.ID)
+			existingRoom.Broadcast(mustMarshal(map[string]interface{}{
+				"type": "player_left",
+				"payload": map[string]interface{}{
+					"playerId": c.ID,
+					"roomId":   c.currentRoom,
+				},
+			}))
+		}
+		c.currentRoom = ""
+	}
+
 	requestedRoomID := strings.TrimSpace(p.RoomID)
 	if requestedRoomID == "" {
 		requestedRoomID = uuid.New().String()

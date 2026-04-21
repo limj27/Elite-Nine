@@ -103,13 +103,12 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 
 func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameManager) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.GameModel = gameState
 	r.GameID = gameID
 	r.GameManager = gm
 	r.State.Status = "active"
-	r.GameStatus = "active" // Set game status
+	r.GameStatus = "active"
+	r.mu.Unlock() // release BEFORE broadcasting
 
 	startMsg := Message{
 		Type: "game_started",
@@ -120,20 +119,25 @@ func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameMa
 		},
 	}
 	r.Broadcast(startMsg.ToJSON())
-
-	r.GameManager.AddGameRoom(r.GameID, r) // Add game room to game manager
+	r.GameManager.AddGameRoom(r.GameID, r)
 }
 
 func (r *GameRoom) RemovePlayer(clientID string) bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if _, exists := r.Players[clientID]; !exists {
+		r.mu.Unlock()
 		return false
 	}
 
 	delete(r.Players, clientID)
 	r.State.PlayerCount = len(r.Players)
+	isEmpty := r.State.PlayerCount == 0
+
+	// Reset status back to waiting if game hasn't started
+	if r.State.Status == "ready" {
+		r.State.Status = "waiting"
+	}
 
 	for i, id := range r.playerOrder {
 		if id == clientID {
@@ -141,6 +145,8 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 			break
 		}
 	}
+
+	r.mu.Unlock() // release BEFORE broadcasting
 
 	leaveMsg := Message{
 		Type: "player_left",
@@ -152,7 +158,7 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 	}
 	r.Broadcast(leaveMsg.ToJSON())
 
-	if r.State.PlayerCount == 0 {
+	if isEmpty {
 		r.Close()
 	}
 
@@ -187,8 +193,13 @@ func (r *GameRoom) GetOrderedClients() []*Client {
 
 func (r *GameRoom) Close() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.State.Status = "closed"
+	// collect clients before unlocking
+	clients := make([]*Client, 0, len(r.Players))
+	for _, client := range r.Players {
+		clients = append(clients, client)
+	}
+	r.mu.Unlock() // release BEFORE broadcasting
 
 	closeMsg := Message{
 		Type: "room_closed",
@@ -198,8 +209,7 @@ func (r *GameRoom) Close() {
 	}
 	r.Broadcast(closeMsg.ToJSON())
 
-	// Disconnect all players
-	for _, client := range r.Players {
+	for _, client := range clients {
 		client.Close()
 	}
 }
