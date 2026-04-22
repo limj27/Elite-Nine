@@ -173,14 +173,14 @@ func (h *Hub) ListRooms() []RoomSummary {
 }
 
 func (h *Hub) BroadcastRoomList() {
-	rooms := h.ListRooms()
-	log.Printf("BroadcastRoomList: broadcasting %d rooms", len(rooms))
-	msg := Message{Type: "rooms_list", Payload: map[string]interface{}{"rooms": rooms}}
-	select {
-	case h.broadcast <- msg.ToJSON():
-	default:
-		log.Println("BroadcastRoomList: broadcast channel full, skipping")
-	}
+	go func() {
+		rooms := h.ListRooms()
+		msg := Message{
+			Type:    "rooms_list",
+			Payload: map[string]interface{}{"rooms": rooms},
+		}
+		h.broadcast <- msg.ToJSON()
+	}()
 }
 
 func (h *Hub) FindRoomByID(roomID string) (*GameRoom, bool) {

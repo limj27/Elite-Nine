@@ -3,201 +3,218 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Elite-Nine WS Smoke Test</title>
-  <style>
-    body{font-family:system-ui, sans-serif;background:#f4f7ff;color:#111;margin:16px}
-    input, button{margin:4px;padding:8px;}
-    #log{border:1px solid #cdd7f2; background:#fff; height:220px; overflow:auto; padding:8px; white-space:pre-wrap; font-size:12px;}
-  </style>
+  <title>Elite Nine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <h1>WebSocket Room Smoke Test</h1>
-  <p>Sign up or log in first. Then your token is used to connect and access rooms.</p>
-  <div>
-    <label>Username <input id="username" value="user1"></label>
-    <label>Password <input type="password" id="password" value="password"></label>
-    <label>Email <input id="email" value="user1@example.com" type="email"></label>
-    <button id="btnLogin">Login & auto-connect</button>
-    <button id="btnSignUp">Sign up & auto-connect</button>
+
+<!-- ═══════════════════════════════════════════ AUTH SCREEN -->
+<div id="screen-auth" class="screen active">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <h1>ELITE<span>9</span></h1>
+      <p>Immaculate Grid · 1v1 Showdown</p>
+    </div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchTab('login')">Sign In</div>
+      <div class="auth-tab" onclick="switchTab('register')">Create Account</div>
+    </div>
+
+    <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+      <div id="login-error" class="error-msg"></div>
+      <div class="field">
+        <label>Username</label>
+        <input id="login-username" type="text" placeholder="your username" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+    </form>
+
+    <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
+      <div id="register-error" class="error-msg"></div>
+      <div class="field">
+        <label>Username</label>
+        <input id="reg-username" type="text" placeholder="choose a username" required>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="reg-email" type="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="reg-password" type="password" placeholder="min 8 characters" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="register-btn">Create Account</button>
+    </form>
   </div>
-  <div style="margin-top:8px">
-    <label>Token <input id="token" style="width:420px;"></label>
-    <button id="btnConnect">Connect with token</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ LOBBY SCREEN -->
+<div id="screen-lobby" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">ELITE<span>9</span></div>
+    <div class="topbar-user">
+      <span class="user-badge" id="lobby-username"></span>
+      <button class="btn btn-outline btn-sm" onclick="handleLogout()">Sign Out</button>
+    </div>
   </div>
 
-  <div style="margin-top:8px">
-    <label>Room name <input id="roomName" value="roomA"></label>
-    <label>Room password <input id="roomPassword"></label>
-    <button id="btnCreate" disabled>Create room</button>
-    <button id="btnJoin" disabled>Join room</button>
-    <button id="btnList" disabled>List rooms</button>
+  <div class="lobby-body">
+    <div class="lobby-main">
+      <div class="rooms-header">
+        <div class="section-title">OPEN ROOMS</div>
+        <button class="btn btn-primary btn-sm" onclick="toggleCreateForm()">+ New Room</button>
+      </div>
+
+      <div class="create-form" id="create-form">
+        <div class="create-form-label">Create Room</div>
+        <div class="field">
+          <label>Room Name</label>
+          <input id="new-room-name" type="text" placeholder="e.g. Yankees vs Sox">
+        </div>
+        <div class="field">
+          <label>Password (optional)</label>
+          <input id="new-room-pass" type="password" placeholder="leave blank for public">
+        </div>
+        <div class="create-form-btns">
+          <button class="btn btn-primary" onclick="handleCreateRoom()" style="flex:1;">Create</button>
+          <button class="btn btn-outline" onclick="toggleCreateForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div class="rooms-list" id="rooms-list">
+        <div class="empty-rooms">
+          <div class="big">⚾</div>
+          <p>No open rooms yet.<br>Be the first to create one.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="lobby-sidebar">
+      <div class="section-title">HOW TO PLAY</div>
+      <div class="how-to-play">
+        <p>Fill a <strong>3×3 grid</strong> with MLB players that match row + column criteria.</p>
+        <p>Players alternate turns. Get <strong>3 in a row</strong> to win.</p>
+        <p><strong class="amber">Overtake</strong> an opponent's cell by entering a rarer answer — rarity is based on how frequently a player appears as a correct answer.</p>
+        <p>The rarer your pick, the harder to beat.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ GAME SCREEN -->
+<div id="screen-game" class="screen">
+  <div class="game-topbar">
+    <div class="game-topbar-left">
+      <div class="topbar-logo">ELITE<span>9</span></div>
+      <div class="room-title" id="game-room-name"></div>
+    </div>
+    <div class="game-topbar-right">
+      <button class="btn btn-outline btn-sm" onclick="handleLeaveRoom()">Leave Room</button>
+    </div>
   </div>
 
-  <div id="rooms" style="margin-top:8px;"></div>
-  <div id="log"></div>
+  <div class="game-body">
+    <div class="game-main" id="game-main">
+      <div class="waiting-state" id="waiting-state">
+        <div class="big">⚾</div>
+        <h2>WAITING FOR PLAYERS</h2>
+        <p>Both players must be ready to start the game.</p>
+      </div>
 
-  <script>
-    let ws;
+      <div id="grid-wrap" style="display:none; flex-direction:column; align-items:center; gap:16px;">
+        <div class="turn-bar" id="turn-bar">
+          <div class="turn-dot"></div>
+          <span id="turn-text">Waiting...</span>
+        </div>
+        <div class="grid-wrap" id="the-grid"></div>
+      </div>
+    </div>
 
-    const log = (m) => {
-      const el = document.getElementById('log');
-      el.textContent += `${new Date().toISOString()} - ${m}\n`;
-      el.scrollTop = el.scrollHeight;
-    };
+    <div class="game-sidebar">
+      <div class="player-card">
+        <div class="player-card-label">You</div>
+        <div class="player-card-inner">
+          <div class="player-avatar p1" id="my-avatar">?</div>
+          <div>
+            <div class="player-card-name" id="my-name">—</div>
+            <div class="player-card-sub" id="my-score">0 cells</div>
+          </div>
+        </div>
+      </div>
 
-    const renderRooms = (rooms) => {
-      const root = document.getElementById('rooms');
-      if (!Array.isArray(rooms) || rooms.length === 0) {
-        root.innerHTML = '<p>No rooms available</p>';
-        return;
-      }
-      root.innerHTML = rooms.map(r =>
-        `<div style='margin:4px 0;padding:6px;border:1px solid #cbd8f5;border-radius:8px;background:#fff'>
-          <strong>${r.name || r.room_name || r.id}</strong> (${r.id || r.room_id})
-          - ${r.player_count || r.playerCount || 0}/${r.max_players || r.maxPlayers || 2}
-          - ${r.status || 'waiting'}
-        </div>`
-      ).join('');
-    };
+      <div class="player-card">
+        <div class="player-card-label">Opponent</div>
+        <div class="player-card-inner">
+          <div class="player-avatar p2" id="opp-avatar">?</div>
+          <div>
+            <div class="player-card-name" id="opp-name">Waiting...</div>
+            <div class="player-card-sub" id="opp-score">0 cells</div>
+          </div>
+        </div>
+      </div>
 
-    const setButtons = (connected) => {
-      document.getElementById('btnCreate').disabled = !connected;
-      document.getElementById('btnJoin').disabled = !connected;
-      document.getElementById('btnList').disabled = !connected;
-    };
+      <div class="divider"></div>
 
-    const handleMessage = (msg) => {
-      switch (msg.type) {
-        case 'connected':
-          log('server assigned clientId: ' + msg.payload?.clientId);
-          break;
+      <div class="ready-btn-wrap" id="ready-section">
+        <button class="btn btn-outline" id="ready-btn" onclick="handleReady()">Mark Ready</button>
+        <div class="ready-status">
+          <div class="ready-dot" id="my-ready-dot"></div>
+          <span id="my-ready-label">You: not ready</span>
+        </div>
+        <div class="ready-status">
+          <div class="ready-dot" id="opp-ready-dot"></div>
+          <span id="opp-ready-label">Opponent: waiting</span>
+        </div>
+        <button class="btn btn-green" id="start-btn" onclick="handleStartGame()" disabled style="margin-top:4px;">Start Game</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-        case 'rooms_list':
-          // Backend sends rooms_list directly — just render it, don't request again
-          const rooms = msg.payload?.rooms || [];
-          renderRooms(rooms);
-          log('rooms_list received: ' + rooms.length + ' room(s) — ' + JSON.stringify(rooms));
-          break;
+<!-- Password modal -->
+<div class="modal-overlay" id="password-modal">
+  <div class="modal">
+    <h3>🔒 Room Password</h3>
+    <div class="field">
+      <label>Enter Password</label>
+      <input id="modal-password" type="password" placeholder="room password">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closePasswordModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPasswordJoin()">Join Room</button>
+    </div>
+  </div>
+</div>
 
-        case 'room_created':
-          // Room created confirmed — backend already sends rooms_list after this
-          log('room created: ' + (msg.payload?.room_name || msg.payload?.room_id));
-          break;
+<!-- Player search modal -->
+<div class="search-modal-overlay" id="search-modal">
+  <div class="search-modal">
+    <h3>Select a Player</h3>
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="player-search-input" placeholder="Search MLB players..." oninput="handlePlayerSearch(this.value)">
+    </div>
+    <div class="search-results" id="search-results">
+      <div class="search-empty">Type a player name to search</div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="closeSearchModal()">Cancel</button>
+  </div>
+</div>
 
-        case 'joined_room':
-          // Joined room confirmed — backend already sends rooms_list after this
-          log('joined room: ' + (msg.payload?.room_name || msg.payload?.room_id));
-          break;
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
-        case 'new_room':
-          log('new_room broadcast: ' + (msg.payload?.room_name || msg.payload?.room_id));
-          break;
-
-        case 'player_left':
-          log('player left room: ' + msg.payload?.playerId);
-          break;
-
-        case 'error':
-          log('ERROR from server: ' + (msg.message || msg.payload?.message || JSON.stringify(msg)));
-          break;
-
-        default:
-          log('unhandled type: ' + msg.type);
-      }
-    };
-
-    const wsConnect = (token) => {
-      if (!token) { log('Cannot connect: missing token'); return; }
-
-      const addr = `ws://${window.location.hostname}:8080/ws?token=${encodeURIComponent(token)}`;
-      ws = new WebSocket(addr);
-
-      ws.onopen = () => { log('connected to ' + addr); setButtons(true); };
-      ws.onclose = () => { log('disconnected'); setButtons(false); };
-      ws.onerror = (e) => { log('ws error: ' + JSON.stringify(e)); };
-
-      ws.onmessage = (e) => {
-        // Backend batches multiple messages into one frame separated by \n
-        const frames = e.data.split('\n').filter(s => s.trim() !== '');
-        frames.forEach(raw => {
-          log('recv raw: ' + raw);
-          try {
-            const msg = JSON.parse(raw);
-            handleMessage(msg);
-          } catch (err) {
-            log('json parse error: ' + err + ' | raw: ' + raw);
-          }
-        });
-      };
-    };
-
-    const authenticateAndConnect = async (route) => {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-      const email = document.getElementById('email').value.trim();
-
-      if (!username || !password) return log('username and password are required');
-      if (route === '/register' && !email) return log('email is required for sign up');
-
-      try {
-        const payload = { username, password };
-        if (route === '/register') payload.email = email;
-
-        const resp = await fetch(route, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!resp.ok) {
-          const text = await resp.text();
-          log(`${route} failed: ${resp.status} ${text}`);
-          return;
-        }
-
-        const body = await resp.json();
-        const token = body.token;
-        if (!token) { log(`${route} did not return token`); return; }
-
-        document.getElementById('token').value = token;
-        localStorage.setItem('ws_token', token);
-        log(`${route} success, connecting websocket`);
-        wsConnect(token);
-      } catch (err) {
-        log(`${route} error: ${err}`);
-      }
-    };
-
-    document.getElementById('btnLogin').onclick = () => authenticateAndConnect('/login');
-    document.getElementById('btnSignUp').onclick = () => authenticateAndConnect('/register');
-
-    document.getElementById('btnConnect').onclick = () => {
-      const token = document.getElementById('token').value.trim() || localStorage.getItem('ws_token');
-      if (!token) { log('token is required to connect'); return; }
-      wsConnect(token);
-    };
-
-    document.getElementById('btnCreate').onclick = () => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
-      const roomName = document.getElementById('roomName').value.trim() || 'roomA';
-      const pass = document.getElementById('roomPassword').value;
-      ws.send(JSON.stringify({ type: 'create_room', payload: { room_name: roomName, password: pass, max_players: 2 } }));
-      log('sent create_room: ' + roomName);
-    };
-
-    document.getElementById('btnJoin').onclick = () => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
-      const roomName = document.getElementById('roomName').value.trim() || 'roomA';
-      const pass = document.getElementById('roomPassword').value;
-      ws.send(JSON.stringify({ type: 'join_room', payload: { room_name: roomName, password: pass } }));
-      log('sent join_room: ' + roomName);
-    };
-
-    document.getElementById('btnList').onclick = () => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return log('ws not open');
-      ws.send(JSON.stringify({ type: 'list_rooms', payload: {} }));
-      log('sent list_rooms');
-    };
-  </script>
+<!-- JS modules — order matters -->
+<script src="js/main.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/websocket.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/game.js"></script>
 </body>
 </html>

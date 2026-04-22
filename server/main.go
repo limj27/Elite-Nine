@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"trivia-server/handlers"
 	"trivia-server/sessions"
 	"trivia-server/websocket"
@@ -29,6 +30,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
 	// Database connection
 	db, err := sql.Open("mysql", os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -59,8 +61,21 @@ func main() {
 	gm := websocket.NewGameManager()
 	router.HandleFunc("/ws", websocket.Handler(wsHub, jwtService, gm))
 
-	// Optional: Serve frontend assets for local test
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("../client/")))
+	// SPA fallback — serve static files if they exist, otherwise serve index.html
+	// This allows /lobby and /game to work as browser URLs without 404ing
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clientDir := "../client"
+		path := filepath.Join(clientDir, r.URL.Path)
+
+		// If the requested path is a real file (JS, CSS, images etc.), serve it directly
+		if _, err := os.Stat(path); err == nil {
+			http.FileServer(http.Dir(clientDir)).ServeHTTP(w, r)
+			return
+		}
+
+		// Otherwise fall back to index.html so the frontend JS can handle routing
+		http.ServeFile(w, r, filepath.Join(clientDir, "index.html"))
+	})
 
 	// Start server
 	log.Printf("Server starting on :%s", port)

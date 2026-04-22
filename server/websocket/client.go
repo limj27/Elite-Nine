@@ -219,10 +219,8 @@ func (c *Client) sendJSON(data interface{}) {
 		log.Printf("sendJSON marshal error: %v", err)
 		return
 	}
-	log.Printf("sendJSON queuing message type for client %s: %s", c.ID, string(bytes))
 	select {
 	case c.send <- bytes:
-		log.Printf("sendJSON queued successfully")
 	default:
 		log.Printf("sendJSON DROPPED - send buffer full for client %s", c.ID)
 	}
@@ -303,14 +301,7 @@ func (c *Client) handleCreateRoom(p createRoomPayload) {
 		},
 	})
 
-	rooms := c.hub.ListRooms()
-	log.Printf("handleCreateRoom: sending rooms_list with %d rooms", len(rooms))
-	c.sendJSON(map[string]interface{}{
-		"type": "rooms_list",
-		"payload": map[string]interface{}{
-			"rooms": rooms,
-		},
-	})
+	c.hub.BroadcastRoomList()
 }
 
 // handleJoinRoom handles a client joining an existing game room.
@@ -348,9 +339,15 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 	}
 
 	c.currentRoom = room.ID
-	c.sendJSON(map[string]interface{}{"type": "joined_room", "payload": map[string]interface{}{"room_id": room.ID, "room_name": room.Name}})
-	c.hub.BroadcastRoomList()
+	c.sendJSON(map[string]interface{}{
+		"type": "joined_room",
+		"payload": map[string]interface{}{
+			"room_id":   room.ID,
+			"room_name": room.Name,
+		},
+	})
 	log.Printf("Client %s joined room %s", c.ID, room.ID)
+	c.hub.BroadcastRoomList()
 }
 func (c *Client) handleStartGame() {
 	if c.currentRoom == "" {
