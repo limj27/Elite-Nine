@@ -36,7 +36,7 @@ function enterGameScreen(roomName) {
 // ── Player joined / left ────────────────────────────────────
 
 function onPlayerJoined(payload) {
-  if (payload.playerId === State.myClientId) return;
+  if (payload.playerId === State.myClientId) return;  // skip if it's yourself
 
   const name = payload.username || ('Player ' + payload.userId);
   document.getElementById('opp-name').textContent   = name;

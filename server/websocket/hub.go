@@ -113,6 +113,9 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 		}
 		h.mu.Unlock()
 	}
+
+	// Notify all clients of updated room list
+	h.BroadcastRoomList()
 }
 
 func (h *Hub) AddRoom(room *GameRoom) {
@@ -131,6 +134,7 @@ type RoomSummary struct {
 	PlayerCount int    `json:"player_count"`
 	MaxPlayers  int    `json:"max_players"`
 	Status      string `json:"status"`
+	HasPassword bool   `json:"has_password"`
 }
 
 func (h *Hub) GetRoom(roomID string) (*GameRoom, bool) {
@@ -167,6 +171,7 @@ func (h *Hub) ListRooms() []RoomSummary {
 			PlayerCount: room.State.PlayerCount,
 			MaxPlayers:  room.State.MaxPlayers,
 			Status:      room.State.Status,
+			HasPassword: room.Password != "",
 		})
 	}
 	return rooms

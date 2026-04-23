@@ -87,6 +87,7 @@ func (r *GameRoom) AddPlayer(client *Client) error {
 			"playerId":    client.ID,
 			"playerCount": r.State.PlayerCount,
 			"userId":      client.userID,
+			"username":    client.username,
 		},
 	}
 	r.Broadcast(joinMsg.ToJSON())

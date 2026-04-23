@@ -355,6 +355,25 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 			"room_name": room.Name,
 		},
 	})
+
+	// Send existing players to the newly joined client
+	// so they know who is already in the room
+	for _, existingClient := range room.GetOrderedClients() {
+		if existingClient.ID == c.ID {
+			continue // skip yourself
+		}
+		c.sendJSON(map[string]interface{}{
+			"type": "player_joined",
+			"payload": map[string]interface{}{
+				"roomId":      room.ID,
+				"playerId":    existingClient.ID,
+				"playerCount": room.State.PlayerCount,
+				"userId":      existingClient.userID,
+				"username":    existingClient.username,
+			},
+		})
+	}
+
 	log.Printf("Client %s joined room %s", c.ID, room.ID)
 	c.hub.BroadcastRoomList()
 }
