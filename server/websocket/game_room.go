@@ -25,6 +25,8 @@ type GameRoom struct {
 	CreatedAt   time.Time
 	mu          sync.RWMutex
 
+	readyPlayers map[string]bool
+
 	GameModel   *models.GameState
 	GameID      int
 	GameManager *GameManager
@@ -39,12 +41,13 @@ type GameState struct {
 
 func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 	return &GameRoom{
-		ID:          id,
-		Name:        name,
-		Password:    password,
-		CreatorID:   creatorID,
-		Players:     make(map[string]*Client),
-		playerOrder: make([]string, 0),
+		ID:           id,
+		Name:         name,
+		Password:     password,
+		CreatorID:    creatorID,
+		Players:      make(map[string]*Client),
+		playerOrder:  make([]string, 0),
+		readyPlayers: make(map[string]bool),
 		State: GameState{
 			Status:      "waiting",
 			PlayerCount: 0,
@@ -131,6 +134,7 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 	}
 
 	delete(r.Players, clientID)
+	delete(r.readyPlayers, clientID)
 	r.State.PlayerCount = len(r.Players)
 	isEmpty := r.State.PlayerCount == 0
 
@@ -163,6 +167,25 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 	}
 
 	return true
+}
+
+// SetReady marks a player as ready or not ready
+// Returns true if ALL players in the room are now ready
+func (r *GameRoom) SetReady(clientID string, ready bool) bool {
+	r.mu.Lock()
+	r.readyPlayers[clientID] = ready
+	playerCount := len(r.Players)
+
+	// Count how many are ready
+	readyCount := 0
+	for _, isReady := range r.readyPlayers {
+		if isReady {
+			readyCount++
+		}
+	}
+	r.mu.Unlock()
+
+	return readyCount == playerCount && playerCount == r.State.MaxPlayers
 }
 
 func (r *GameRoom) Broadcast(message []byte) {

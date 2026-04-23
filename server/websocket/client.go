@@ -208,6 +208,15 @@ func (c *Client) handleMessage(msg wsMessage) {
 		c.sendJSON(map[string]interface{}{"type": "rooms_list", "payload": map[string]interface{}{"rooms": rooms}})
 	case "leave_room":
 		c.handleLeaveRoom()
+	case "player_ready":
+		var p struct {
+			Ready bool `json:"ready"`
+		}
+		if err := json.Unmarshal(msg.Payload, &p); err != nil {
+			c.sendError("invalid player_ready payload")
+			return
+		}
+		c.handlePlayerReady(p.Ready)
 	default:
 		c.sendError("unknown message type")
 	}
@@ -435,6 +444,38 @@ func (c *Client) handleLeaveRoom() {
 	}
 	c.currentRoom = ""
 	c.hub.BroadcastRoomList()
+}
+
+func (c *Client) handlePlayerReady(ready bool) {
+	if c.currentRoom == "" {
+		c.sendError("not in a room")
+		return
+	}
+
+	room, exists := c.hub.GetRoom(c.currentRoom)
+	if !exists {
+		c.sendError("room not found")
+		return
+	}
+
+	// Broadcast ready status to everyone in the room
+	room.Broadcast(mustMarshal(map[string]interface{}{
+		"type": "player_ready",
+		"payload": map[string]interface{}{
+			"playerId": c.ID,
+			"username": c.username,
+			"ready":    ready,
+		},
+	}))
+
+	// Only send room_ready if ALL players are ready
+	allReady := room.SetReady(c.ID, ready)
+	if allReady {
+		room.Broadcast(mustMarshal(map[string]interface{}{
+			"type":    "room_ready",
+			"payload": map[string]interface{}{"roomId": room.ID},
+		}))
+	}
 }
 
 func (c *Client) Close() {
