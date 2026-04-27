@@ -12,6 +12,8 @@ const State = {
   oppReady: false,
   gameStarted: false,
   myTurn: false,
+  playerIndex: 0,
+  players: [],
 };
 
 // ═══════════════════════════════════════════════════════════

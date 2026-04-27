@@ -415,6 +415,17 @@ func (c *Client) handleStartGame() {
 
 	room.StartGame(gs, 0, c.GameManager)
 
+	// Tell each player which index they are
+	for i, cl := range room.GetOrderedClients() {
+		cl.sendJSON(map[string]interface{}{
+			"type": "game_started",
+			"payload": map[string]interface{}{
+				"playerIndex": i,
+				"roomId":      room.ID,
+			},
+		})
+	}
+
 	// Broadcast initial game state for both clients explicitly
 	room.Broadcast(mustMarshal(map[string]interface{}{"type": "game_state", "payload": room.GameModel}))
 }
@@ -436,12 +447,12 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
-	move, _, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, p.Answer)
+	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, p.Answer)
 	if err != nil {
 		c.sendError(err.Error())
 		return
 	}
-
+	log.Printf("Move made by user %d, new turn: %d", uid, newTurn)
 	// persist move using gamemanager or DB as needed
 
 	// broadcast updated game state to room
@@ -489,6 +500,7 @@ func (c *Client) handlePlayerReady(ready bool) {
 
 	// Only send room_ready if ALL players are ready
 	allReady := room.SetReady(c.ID, ready)
+	log.Printf("handlePlayerReady: client %s ready=%v allReady=%v", c.ID, ready, allReady)
 	if allReady {
 		room.Broadcast(mustMarshal(map[string]interface{}{
 			"type":    "room_ready",

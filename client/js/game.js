@@ -89,6 +89,7 @@ function handleStartGame() {
 // ── Game state updates ───────────────────────────────────────
 
 function onGameState(payload) {
+  // Build grid if not already built (fallback)
   if (!State.gameStarted) {
     State.gameStarted = true;
     document.getElementById('waiting-state').style.display = 'none';
@@ -97,14 +98,15 @@ function onGameState(payload) {
     buildGrid();
   }
 
-  if (payload?.current_turn !== undefined) {
-    updateTurnBar(payload.current_turn);
+  if (payload?.game?.current_turn !== undefined) {
+    updateTurnBar(payload.game.current_turn);
   }
 
-  if (payload?.cells) {
-    updateGridFromState(payload.cells);
+  if (payload?.grid) {
+    updateGridFromState(payload.grid);
   }
 }
+
 
 function onMoveMade(payload) {
   if (payload?.cell_index === undefined) return;
@@ -118,20 +120,37 @@ function onMoveMade(payload) {
 }
 
 function updateTurnBar(currentTurn) {
-  // currentTurn 0 = player 0 (you), 1 = player 1 (opponent)
-  State.myTurn = currentTurn === 0;
-  const text   = State.myTurn ? 'Your turn' : "Opponent's turn";
+  console.log('updateTurnBar — currentTurn:', currentTurn, 'playerIndex:', State.playerIndex, 'myTurn:', currentTurn === State.playerIndex);
+  State.myTurn = currentTurn === State.playerIndex;
+  const text = State.myTurn ? 'Your turn' : "Opponent's turn";
+  console.log('setting turn text to:', text);
   document.getElementById('turn-text').textContent = text;
   document.getElementById('turn-bar').style.borderColor = State.myTurn
     ? 'rgba(59,130,246,0.5)'
     : 'rgba(239,68,68,0.3)';
 }
 
-function updateGridFromState(cells) {
-  cells.forEach((c, i) => {
-    gridState[i] = { owner: c.owner, player: c.player, rarity: c.rarity || 0 };
-    renderCell(i);
-  });
+function updateGridFromState(grid) {
+  // grid is [3][3] — iterate rows and cols
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const idx  = row * 3 + col;
+      const move = grid[row][col]; // null if no move yet
+
+      if (!move) {
+        gridState[idx] = { owner: null, player: null, rarity: 0 };
+      } else {
+        // Determine owner based on which player made the move
+        const playerIndex = State.players?.findIndex(p => p.user_id === move.user_id);
+        gridState[idx] = {
+          owner:  playerIndex === 0 ? 'p1' : 'p2',
+          player: { fullName: move.player_name || move.player_answer },
+          rarity: 0,
+        };
+      }
+      renderCell(idx);
+    }
+  }
 }
 
 // ── Leave room ───────────────────────────────────────────────
@@ -283,14 +302,16 @@ function selectPlayer(encoded) {
   try { player = JSON.parse(decodeURIComponent(encoded)); }
   catch { return; }
 
+  console.log('sending make_move with room_id:', State.currentRoom?.room_id);  // add this
+
   wsSend('make_move', {
-    room_id:          State.currentRoom?.room_id,
-    row:              Math.floor(selectedCell / 3),
-    col:              selectedCell % 3,
-    answer:           player.fullName,
-    player_id:        player.id,
-    player_name:      player.fullName,
-    player_headshot:  player.headshot,
+    room_id:         State.currentRoom?.room_id,
+    row:             Math.floor(selectedCell / 3),
+    col:             selectedCell % 3,
+    answer:          player.fullName,
+    player_id:       player.id,
+    player_name:     player.fullName,
+    player_headshot: player.headshot,
   });
 
   closeSearchModal();

@@ -51,10 +51,18 @@ function handleServerMessage(msg) {
 
     // ── Room join / create ───────────────────────────────────
     case 'room_created':
-    case 'joined_room':
       State.currentRoom = msg.payload;
-      State.isCreator   = msg.type === 'room_created';
+      State.isCreator   = true;
       enterGameScreen(msg.payload.room_name);
+      break;
+
+    case 'joined_room':
+      // Only enter game screen if not already there
+      if (!State.gameStarted && !State.currentRoom) {
+        State.currentRoom = msg.payload;
+        State.isCreator   = false;
+        enterGameScreen(msg.payload.room_name);
+      }
       break;
 
     // ── In-room events ───────────────────────────────────────
@@ -63,6 +71,7 @@ function handleServerMessage(msg) {
     case 'player_ready':  onPlayerReady(msg.payload);   break;
 
     case 'room_ready':
+      console.log('room_ready received, isCreator:', State.isCreator);
       if (State.isCreator) {
         document.getElementById('start-btn').disabled = false;
         showToast('Both players ready! You can start the game.', 'success');
@@ -71,7 +80,27 @@ function handleServerMessage(msg) {
 
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':
+      console.log('game_started received, playerIndex:', msg.payload?.playerIndex);
+      if (msg.payload?.playerIndex !== undefined) {
+        State.playerIndex = msg.payload.playerIndex;
+      }
+      // Don't call onGameState here — wait for the game_state broadcast
+      // Just trigger the grid display
+      if (!State.gameStarted) {
+        State.gameStarted = true;
+        document.getElementById('waiting-state').style.display = 'none';
+        document.getElementById('grid-wrap').style.display     = 'flex';
+        document.getElementById('ready-section').style.display = 'none';
+        buildGrid();
+      }
+      break;
+
     case 'game_state':
+      console.log('game_state received, current_turn:', msg.payload?.game?.current_turn, 
+      'playerIndex AT THIS MOMENT:', State.playerIndex);
+      if (msg.payload?.players) {
+        State.players = msg.payload.players;
+      }
       onGameState(msg.payload);
       break;
 

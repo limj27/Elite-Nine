@@ -112,17 +112,10 @@ func (r *GameRoom) StartGame(gameState *models.GameState, gameID int, gm *GameMa
 	r.GameManager = gm
 	r.State.Status = "active"
 	r.GameStatus = "active"
-	r.mu.Unlock() // release BEFORE broadcasting
+	r.mu.Unlock()
 
-	startMsg := Message{
-		Type: "game_started",
-		Payload: map[string]interface{}{
-			"roomId": r.ID,
-			"gameId": r.GameID,
-			"state":  r.GameModel,
-		},
-	}
-	r.Broadcast(startMsg.ToJSON())
+	// Remove the startMsg broadcast — handleStartGame sends game_started
+	// with playerIndex to each client individually instead
 	r.GameManager.AddGameRoom(r.GameID, r)
 }
 
