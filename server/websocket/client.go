@@ -409,6 +409,22 @@ func (c *Client) handleStartGame() {
 		return
 	}
 
+	// Safety check — verify all players are actually ready
+	room.mu.RLock()
+	playerCount := len(room.Players)
+	readyCount := 0
+	for _, isReady := range room.readyPlayers {
+		if isReady {
+			readyCount++
+		}
+	}
+	room.mu.RUnlock()
+
+	if readyCount < playerCount || playerCount < room.State.MaxPlayers {
+		c.sendError("not all players are ready")
+		return
+	}
+
 	players := make([]models.GamePlayer, 0, len(room.Players))
 	for _, cl := range room.GetOrderedClients() {
 		uid, _ := strconv.Atoi(cl.userID)
