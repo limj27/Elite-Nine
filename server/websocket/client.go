@@ -376,6 +376,27 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 
 	log.Printf("Client %s joined room %s", c.ID, room.ID)
 	c.hub.BroadcastRoomList()
+
+	// After sending existing players, send their ready status too
+	room.mu.RLock()
+	for clientID, isReady := range room.readyPlayers {
+		if clientID == c.ID {
+			continue
+		}
+		existingClient, exists := room.Players[clientID]
+		if !exists {
+			continue
+		}
+		c.sendJSON(map[string]interface{}{
+			"type": "player_ready",
+			"payload": map[string]interface{}{
+				"playerId": clientID,
+				"username": existingClient.username,
+				"ready":    isReady,
+			},
+		})
+	}
+	room.mu.RUnlock()
 }
 func (c *Client) handleStartGame() {
 	if c.currentRoom == "" {
