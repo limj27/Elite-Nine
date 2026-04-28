@@ -58,10 +58,13 @@ type joinRoomPayload struct {
 }
 
 type makeMovePayload struct {
-	RoomID string `json:"room_id"`
-	Row    int    `json:"row"`
-	Col    int    `json:"col"`
-	Answer string `json:"answer"`
+	RoomID         string `json:"room_id"`
+	Row            int    `json:"row"`
+	Col            int    `json:"col"`
+	Answer         string `json:"answer"`
+	PlayerID       int    `json:"player_id"`
+	PlayerName     string `json:"player_name"`
+	PlayerHeadshot string `json:"player_headshot"`
 }
 
 type Client struct {
@@ -489,6 +492,11 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		c.sendError(err.Error())
 		return
 	}
+
+	// Attach extra display info to the move
+	move.PlayerName = p.PlayerName
+	move.Headshot = p.PlayerHeadshot
+
 	log.Printf("Move made by user %d, new turn: %d", uid, newTurn)
 	// persist move using gamemanager or DB as needed
 

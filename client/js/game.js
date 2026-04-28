@@ -98,6 +98,13 @@ function onGameState(payload) {
     buildGrid();
   }
 
+  // Check for game over
+  if (payload?.game?.status === 'completed' && payload?.game?.winner_id) {
+    updateGridFromState(payload.grid);
+    setTimeout(() => showWinScreen(payload.game.winner_id), 500);
+    return;
+  }
+
   if (payload?.game?.current_turn !== undefined) {
     updateTurnBar(payload.game.current_turn);
   }
@@ -131,20 +138,21 @@ function updateTurnBar(currentTurn) {
 }
 
 function updateGridFromState(grid) {
-  // grid is [3][3] — iterate rows and cols
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const idx  = row * 3 + col;
-      const move = grid[row][col]; // null if no move yet
+      const move = grid[row][col];
 
       if (!move) {
         gridState[idx] = { owner: null, player: null, rarity: 0 };
       } else {
-        // Determine owner based on which player made the move
         const playerIndex = State.players?.findIndex(p => p.user_id === move.user_id);
         gridState[idx] = {
           owner:  playerIndex === 0 ? 'p1' : 'p2',
-          player: { fullName: move.player_name || move.player_answer },
+          player: {
+            fullName: move.player_name || move.player_answer,
+            headshot: move.headshot || '',   // add this
+          },
           rarity: 0,
         };
       }
@@ -161,6 +169,9 @@ function handleLeaveRoom() {
   State.gameStarted  = false;
   State.myReady      = false;
   State.oppReady     = false;
+  State.playerIndex  = 0;
+  const overlay = document.getElementById('win-overlay');
+  if (overlay) overlay.remove();   // add this
   showScreen('lobby');
   requestRoomList();
 }
@@ -315,4 +326,34 @@ function selectPlayer(encoded) {
   });
 
   closeSearchModal();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Win Screen
+// ═══════════════════════════════════════════════════════════
+function showWinScreen(winnerId) {
+  const isWinner = State.players?.find(p => p.user_id === winnerId)?.user_id === 
+    State.players?.[State.playerIndex]?.user_id;
+  
+  const message = isWinner ? '🏆 You Win!' : '😔 You Lose!';
+  const color   = isWinner ? 'var(--green)' : 'var(--red)';
+
+  // Overlay on top of the grid
+  const overlay = document.createElement('div');
+  overlay.id = 'win-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; z-index: 500; gap: 20px;
+  `;
+  overlay.innerHTML = `
+    <div style="font-family: var(--font-display); font-size: 72px; color: ${color}; letter-spacing: 4px;">
+      ${message}
+    </div>
+    <div style="font-size: 16px; color: var(--text2);">Game over</div>
+    <button class="btn btn-primary" style="width:200px;" onclick="handleLeaveRoom()">
+      Back to Lobby
+    </button>
+  `;
+  document.body.appendChild(overlay);
 }
