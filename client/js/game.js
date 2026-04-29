@@ -33,6 +33,22 @@ function enterGameScreen(roomName) {
   showScreen('game');
 }
 
+function updatePlayerColors() {
+  const myClass  = State.playerIndex === 0 ? 'p1' : 'p2';
+  const oppClass = State.playerIndex === 0 ? 'p2' : 'p1';
+
+  const myAvatar  = document.getElementById('my-avatar');
+  const oppAvatar = document.getElementById('opp-avatar');
+
+  // Remove existing color classes
+  myAvatar.classList.remove('p1', 'p2');
+  oppAvatar.classList.remove('p1', 'p2');
+
+  // Apply correct colors
+  myAvatar.classList.add(myClass);
+  oppAvatar.classList.add(oppClass);
+}
+
 // ── Player joined / left ────────────────────────────────────
 
 function onPlayerJoined(payload) {
@@ -146,12 +162,13 @@ function updateGridFromState(grid) {
       if (!move) {
         gridState[idx] = { owner: null, player: null, rarity: 0 };
       } else {
-        const playerIndex = State.players?.findIndex(p => p.user_id === move.user_id);
+        // Find which player index made this move
+        const movePlayerIndex = State.players?.findIndex(p => p.user_id === move.user_id);
         gridState[idx] = {
-          owner:  playerIndex === 0 ? 'p1' : 'p2',
+          owner:  movePlayerIndex === 0 ? 'p1' : 'p2',
           player: {
             fullName: move.player_name || move.player_answer,
-            headshot: move.headshot || '',   // add this
+            headshot: move.headshot || '',
           },
           rarity: 0,
         };

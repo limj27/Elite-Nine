@@ -251,3 +251,89 @@ CREATE TABLE IF NOT EXISTS grid_categories (
     INDEX idx_difficulty (difficulty),
     INDEX idx_active (is_active)
 );
+
+-- ═══════════════════════════════════════════════════════════
+-- ELITE NINE — GRID DATA SCHEMA
+-- ═══════════════════════════════════════════════════════════
+
+-- Criteria: teams and stats that appear as row/column headers
+CREATE TABLE IF NOT EXISTS criteria (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    type        ENUM('team', 'stat', 'award', 'position') NOT NULL,
+    label       VARCHAR(100) NOT NULL,   -- "New York Yankees", "500+ HR Career"
+    short_label VARCHAR(50),             -- "NYY", "500 HR"
+    description VARCHAR(255),
+    mlb_team_id INT DEFAULT NULL,        -- MLB Stats API team ID (for team criteria)
+    stat_field  VARCHAR(50) DEFAULT NULL, -- "homeRuns", "battingAverage" etc
+    stat_value  FLOAT DEFAULT NULL,      -- threshold value e.g. 0.300, 500, 3000
+    stat_group  ENUM('hitting', 'pitching') DEFAULT NULL,
+    award_id    VARCHAR(50) DEFAULT NULL, -- "MLBHOF", "MLBMVP" etc
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_label (label)
+);
+
+-- Players pulled from MLB Stats API
+CREATE TABLE IF NOT EXISTS mlb_players (
+    id           INT PRIMARY KEY AUTO_INCREMENT,
+    mlb_id       INT NOT NULL UNIQUE,    -- MLB Stats API player ID
+    full_name    VARCHAR(100) NOT NULL,
+    position     VARCHAR(10),
+    headshot_url VARCHAR(255),
+    active       BOOLEAN DEFAULT FALSE,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Which players satisfy which criteria
+CREATE TABLE IF NOT EXISTS player_criteria (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    mlb_id      INT NOT NULL,
+    criteria_id INT NOT NULL,
+    FOREIGN KEY (mlb_id) REFERENCES mlb_players(mlb_id),
+    FOREIGN KEY (criteria_id) REFERENCES criteria(id),
+    UNIQUE KEY unique_player_criteria (mlb_id, criteria_id)
+);
+
+-- Pre-built grid templates
+CREATE TABLE IF NOT EXISTS grid_templates (
+    id              INT PRIMARY KEY AUTO_INCREMENT,
+    row_criteria_1  INT NOT NULL,
+    row_criteria_2  INT NOT NULL,
+    row_criteria_3  INT NOT NULL,
+    col_criteria_1  INT NOT NULL,
+    col_criteria_2  INT NOT NULL,
+    col_criteria_3  INT NOT NULL,
+    min_answers     INT DEFAULT 0,   -- minimum valid answers across all 9 cells
+    difficulty      ENUM('easy', 'medium', 'hard') DEFAULT 'medium',
+    active          BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (row_criteria_1) REFERENCES criteria(id),
+    FOREIGN KEY (row_criteria_2) REFERENCES criteria(id),
+    FOREIGN KEY (row_criteria_3) REFERENCES criteria(id),
+    FOREIGN KEY (col_criteria_1) REFERENCES criteria(id),
+    FOREIGN KEY (col_criteria_2) REFERENCES criteria(id),
+    FOREIGN KEY (col_criteria_3) REFERENCES criteria(id)
+);
+
+-- Valid answers per cell (row x col intersection)
+-- Pre-computed so validation is instant at game time
+CREATE TABLE IF NOT EXISTS cell_answers (
+    id               INT PRIMARY KEY AUTO_INCREMENT,
+    grid_template_id INT NOT NULL,
+    row_index        INT NOT NULL,        -- 0, 1, 2
+    col_index        INT NOT NULL,        -- 0, 1, 2
+    mlb_id           INT NOT NULL,
+    player_name      VARCHAR(100) NOT NULL,
+    headshot_url     VARCHAR(255),
+    rarity_score     FLOAT DEFAULT 0.5,   -- 0.0 = very rare, 1.0 = very common
+    FOREIGN KEY (grid_template_id) REFERENCES grid_templates(id),
+    FOREIGN KEY (mlb_id) REFERENCES mlb_players(mlb_id),
+    UNIQUE KEY unique_cell_answer (grid_template_id, row_index, col_index, mlb_id)
+);
+
+-- Track how often each player is used as an answer (for rarity)
+CREATE TABLE IF NOT EXISTS answer_frequency (
+    mlb_id       INT NOT NULL PRIMARY KEY,
+    use_count    INT DEFAULT 0,
+    FOREIGN KEY (mlb_id) REFERENCES mlb_players(mlb_id)
+);

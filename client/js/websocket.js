@@ -80,12 +80,10 @@ function handleServerMessage(msg) {
 
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':
-      console.log('game_started received, playerIndex:', msg.payload?.playerIndex);
       if (msg.payload?.playerIndex !== undefined) {
         State.playerIndex = msg.payload.playerIndex;
+        updatePlayerColors();  // add this
       }
-      // Don't call onGameState here — wait for the game_state broadcast
-      // Just trigger the grid display
       if (!State.gameStarted) {
         State.gameStarted = true;
         document.getElementById('waiting-state').style.display = 'none';
