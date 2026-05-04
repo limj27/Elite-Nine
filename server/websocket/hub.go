@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"database/sql"
 	"log"
 	"sync"
 )
@@ -18,16 +19,18 @@ type Hub struct {
 	//Game rooms
 	rooms map[string]*GameRoom
 	mu    sync.RWMutex
+	DB    *sql.DB
 }
 
 // Creates a new WebSocket hub instance
-func NewHub() *Hub {
+func NewHub(db *sql.DB) *Hub {
 	return &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
 		rooms:      make(map[string]*GameRoom),
+		DB:         db,
 	}
 }
 

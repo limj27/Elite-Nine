@@ -81,15 +81,20 @@ function handleServerMessage(msg) {
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':
       if (msg.payload?.playerIndex !== undefined) {
-        State.playerIndex = msg.payload.playerIndex;
-        updatePlayerColors();  // add this
+          State.playerIndex    = msg.payload.playerIndex;
+          State.gridTemplate   = {
+              rowCriteria: msg.payload.rowCriteria,
+              colCriteria: msg.payload.colCriteria,
+          };
+          updatePlayerColors();
+          renderGridHeaders();  // new function
       }
       if (!State.gameStarted) {
-        State.gameStarted = true;
-        document.getElementById('waiting-state').style.display = 'none';
-        document.getElementById('grid-wrap').style.display     = 'flex';
-        document.getElementById('ready-section').style.display = 'none';
-        buildGrid();
+          State.gameStarted = true;
+          document.getElementById('waiting-state').style.display = 'none';
+          document.getElementById('grid-wrap').style.display     = 'flex';
+          document.getElementById('ready-section').style.display = 'none';
+          buildGrid();
       }
       break;
 

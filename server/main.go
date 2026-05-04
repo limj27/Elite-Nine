@@ -15,9 +15,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func setupWebSocket() *websocket.Hub {
-	hub := websocket.NewHub()
-	go hub.Run() // Start the WebSocket hub in a goroutine
+func setupWebSocket(db *sql.DB) *websocket.Hub {
+	hub := websocket.NewHub(db)
+	go hub.Run()
 	return hub
 }
 
@@ -55,7 +55,7 @@ func main() {
 	SetupUserRoutes(router, userHandler, jwtService)
 
 	// WebSocket Hub
-	wsHub := setupWebSocket()
+	wsHub := setupWebSocket(db)
 
 	// Create GameManager and pass into handler along with JWT service
 	gm := websocket.NewGameManager()

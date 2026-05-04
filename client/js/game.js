@@ -257,6 +257,24 @@ function onCellClick(idx) {
   openSearchModal();
 }
 
+function renderGridHeaders() {
+    if (!State.gridTemplate) return;
+
+    const { rowCriteria, colCriteria } = State.gridTemplate;
+
+    // Update column headers
+    colCriteria.forEach((crit, i) => {
+        const el = document.getElementById('col-header-' + i);
+        if (el) el.textContent = crit.short_label || crit.label;
+    });
+
+    // Update row headers
+    rowCriteria.forEach((crit, i) => {
+        const el = document.getElementById('row-header-' + i);
+        if (el) el.textContent = crit.short_label || crit.label;
+    });
+}
+
 // ═══════════════════════════════════════════════════════════
 // MLB PLAYER SEARCH
 // Uses the free MLB Stats API — no key required

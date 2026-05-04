@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"trivia-server/game"
+	"trivia-server/grid"
 	"trivia-server/models"
 
 	"github.com/google/uuid"
@@ -401,6 +402,7 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 	}
 	room.mu.RUnlock()
 }
+
 func (c *Client) handleStartGame() {
 	if c.currentRoom == "" {
 		c.sendError("not in a room")
@@ -442,6 +444,18 @@ func (c *Client) handleStartGame() {
 		return
 	}
 
+	// Pick a random grid template
+	gridSvc := grid.NewService(c.hub.DB)
+	gridTemplate, err := gridSvc.GetRandomGrid()
+	if err != nil {
+		log.Printf("Failed to get grid template: %v", err)
+		c.sendError("failed to load grid — make sure the database is populated")
+		return
+	}
+
+	// Store grid template ID on the room for move validation later
+	room.GridTemplateID = gridTemplate.ID
+
 	gameModel := models.Game{
 		Status:      models.GameStatusActive,
 		CurrentTurn: 0,
@@ -455,19 +469,25 @@ func (c *Client) handleStartGame() {
 
 	room.StartGame(gs, 0, c.GameManager)
 
-	// Tell each player which index they are
+	// Tell each player their index AND the grid template
 	for i, cl := range room.GetOrderedClients() {
 		cl.sendJSON(map[string]interface{}{
 			"type": "game_started",
 			"payload": map[string]interface{}{
 				"playerIndex": i,
 				"roomId":      room.ID,
+				"rowCriteria": gridTemplate.RowCriteria,
+				"colCriteria": gridTemplate.ColCriteria,
+				"difficulty":  gridTemplate.Difficulty,
 			},
 		})
 	}
 
-	// Broadcast initial game state for both clients explicitly
-	room.Broadcast(mustMarshal(map[string]interface{}{"type": "game_state", "payload": room.GameModel}))
+	// Broadcast initial game state
+	room.Broadcast(mustMarshal(map[string]interface{}{
+		"type":    "game_state",
+		"payload": room.GameModel,
+	}))
 }
 
 func (c *Client) handleMakeMove(p makeMovePayload) {
@@ -487,23 +507,33 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
-	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, p.Answer)
+	// Validate the answer against the grid template
+	gridSvc := grid.NewService(c.hub.DB)
+	result, err := gridSvc.ValidateAnswer(room.GridTemplateID, p.Row, p.Col, p.PlayerID, p.Answer)
+	if err != nil {
+		log.Printf("Validation error: %v", err)
+		c.sendError("validation error")
+		return
+	}
+
+	if !result.Valid {
+		c.sendError(result.Message)
+		return
+	}
+
+	// Use the validated player name and headshot from the database
+	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, result.Answer.PlayerName)
 	if err != nil {
 		c.sendError(err.Error())
 		return
 	}
 
-	// Attach extra display info to the move
-	move.PlayerName = p.PlayerName
-	move.Headshot = p.PlayerHeadshot
+	move.PlayerName = result.Answer.PlayerName
+	move.Headshot = result.Answer.HeadshotURL
 
-	log.Printf("Move made by user %d, new turn: %d", uid, newTurn)
-	// persist move using gamemanager or DB as needed
+	log.Printf("Move made by user %d, new turn: %d, rarity: %.2f", uid, newTurn, result.RarityScore)
 
-	// broadcast updated game state to room
 	room.Broadcast(mustMarshal(map[string]interface{}{"type": "game_state", "payload": room.GameModel}))
-
-	// also broadcast the single move event if desired
 	room.Broadcast(mustMarshal(map[string]interface{}{"type": "move_made", "payload": move}))
 }
 

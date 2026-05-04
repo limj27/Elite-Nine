@@ -27,10 +27,11 @@ type GameRoom struct {
 
 	readyPlayers map[string]bool
 
-	GameModel   *models.GameState
-	GameID      int
-	GameManager *GameManager
-	GameStatus  string
+	GameModel      *models.GameState
+	GameID         int
+	GameManager    *GameManager
+	GameStatus     string
+	GridTemplateID int
 }
 
 type GameState struct {

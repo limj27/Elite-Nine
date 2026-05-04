@@ -14,6 +14,7 @@ const State = {
   myTurn: false,
   playerIndex: 0,
   players: [],
+  gridTemplate: null, 
 };
 
 // ═══════════════════════════════════════════════════════════
