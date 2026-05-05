@@ -33,10 +33,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		//Modify this function to check for proper origin checking
-		//For example, you can check against a list of allowed origins
-		//For now, we allow all origins for simplicity
-		return true // Allow all origins for simplicity; adjust as needed,
+		return true
 	},
 }
 
@@ -73,10 +70,9 @@ type Client struct {
 	conn        *websocket.Conn
 	send        chan []byte
 	ID          string
-	userID      string //From JWT Token
-	username    string //From JWT Token
+	userID      string
+	username    string
 	GameManager *GameManager
-
 	currentRoom string
 }
 
@@ -84,8 +80,8 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID string, username string, g
 	return &Client{
 		hub:         hub,
 		conn:        conn,
-		send:        make(chan []byte, 256), // Buffered channel to prevent blocking
-		ID:          uuid.New().String(),    // Use remote address as client ID
+		send:        make(chan []byte, 256),
+		ID:          uuid.New().String(),
 		userID:      userID,
 		username:    username,
 		GameManager: gm,
@@ -98,7 +94,6 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		c.conn.Close()
 		c.hub.removeClientFromRooms(c)
-
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
@@ -117,7 +112,6 @@ func (c *Client) readPump() {
 			break
 		}
 
-		//normalize
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 
 		var msg wsMessage
@@ -142,7 +136,6 @@ func (c *Client) writePump() {
 		case message, ok := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// hub closed the channel
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -154,7 +147,6 @@ func (c *Client) writePump() {
 			}
 			_, _ = w.Write(message)
 
-			// send queued messages
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
@@ -174,7 +166,7 @@ func (c *Client) writePump() {
 	}
 }
 
-// handleMesasage processes incoming messages from the client.
+// handleMessage processes incoming messages from the client.
 func (c *Client) handleMessage(msg wsMessage) {
 	switch msg.Type {
 	case "create_room":
@@ -248,7 +240,6 @@ func (c *Client) sendError(msg string) {
 
 // handleCreateRoom handles the creation of a new game room.
 func (c *Client) handleCreateRoom(p createRoomPayload) {
-	// If client is already in a room, remove them from that room first
 	if c.currentRoom != "" {
 		if existingRoom, exists := c.hub.GetRoom(c.currentRoom); exists {
 			existingRoom.RemovePlayer(c.ID)
@@ -361,10 +352,9 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 	})
 
 	// Send existing players to the newly joined client
-	// so they know who is already in the room
 	for _, existingClient := range room.GetOrderedClients() {
 		if existingClient.ID == c.ID {
-			continue // skip yourself
+			continue
 		}
 		c.sendJSON(map[string]interface{}{
 			"type": "player_joined",
@@ -381,7 +371,7 @@ func (c *Client) handleJoinRoom(p joinRoomPayload) {
 	log.Printf("Client %s joined room %s", c.ID, room.ID)
 	c.hub.BroadcastRoomList()
 
-	// After sending existing players, send their ready status too
+	// Send ready status of existing players to the newly joined client
 	room.mu.RLock()
 	for clientID, isReady := range room.readyPlayers {
 		if clientID == c.ID {
@@ -453,7 +443,6 @@ func (c *Client) handleStartGame() {
 		return
 	}
 
-	// Store grid template ID on the room for move validation later
 	room.GridTemplateID = gridTemplate.ID
 
 	gameModel := models.Game{
@@ -469,7 +458,7 @@ func (c *Client) handleStartGame() {
 
 	room.StartGame(gs, 0, c.GameManager)
 
-	// Tell each player their index AND the grid template
+	// Tell each player their index and the grid template
 	for i, cl := range room.GetOrderedClients() {
 		cl.sendJSON(map[string]interface{}{
 			"type": "game_started",
@@ -516,25 +505,95 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
-	if !result.Valid {
-		c.sendError(result.Message)
-		return
-	}
-
-	// Use the validated player name and headshot from the database
-	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, result.Answer.PlayerName)
+	// Always make the move — turn advances regardless of answer validity
+	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, p.Answer)
 	if err != nil {
 		c.sendError(err.Error())
 		return
 	}
 
-	move.PlayerName = result.Answer.PlayerName
-	move.Headshot = result.Answer.HeadshotURL
+	if result.Valid {
+		move.IsValid = true
+		move.PlayerName = result.Answer.PlayerName
+		move.Headshot = result.Answer.HeadshotURL
 
-	log.Printf("Move made by user %d, new turn: %d, rarity: %.2f", uid, newTurn, result.RarityScore)
+		existingMove := room.GameModel.Grid[p.Row][p.Col]
 
-	room.Broadcast(mustMarshal(map[string]interface{}{"type": "game_state", "payload": room.GameModel}))
-	room.Broadcast(mustMarshal(map[string]interface{}{"type": "move_made", "payload": move}))
+		if existingMove == nil {
+			// Empty cell — place it and check for win
+			room.GameModel.Grid[p.Row][p.Col] = move
+
+			if game.CheckWin(room.GameModel, uid) {
+				room.GameModel.Game.Status = models.GameStatusCompleted
+				room.GameModel.Game.WinnerID = &uid
+			}
+
+		} else {
+			// Cell occupied — check rarity to determine overtake
+			existingResult, err := gridSvc.ValidateAnswer(
+				room.GridTemplateID, p.Row, p.Col,
+				*existingMove.PlayerID, existingMove.PlayerAnswer,
+			)
+
+			canOvertake := false
+			if err != nil || !existingResult.Valid {
+				// Existing answer no longer valid — always allow overtake
+				canOvertake = true
+			} else {
+				// Lower rarity score = rarer — new answer must be strictly rarer
+				canOvertake = result.RarityScore < existingResult.RarityScore
+			}
+
+			if canOvertake {
+				room.GameModel.Grid[p.Row][p.Col] = move
+
+				// Check win after overtake
+				if game.CheckWin(room.GameModel, uid) {
+					room.GameModel.Game.Status = models.GameStatusCompleted
+					room.GameModel.Game.WinnerID = &uid
+				}
+
+				room.Broadcast(mustMarshal(map[string]interface{}{
+					"type": "cell_overtaken",
+					"payload": map[string]interface{}{
+						"row":         p.Row,
+						"col":         p.Col,
+						"newPlayer":   result.Answer.PlayerName,
+						"oldPlayer":   existingMove.PlayerName,
+						"rarityScore": result.RarityScore,
+					},
+				}))
+			} else {
+				// Valid answer but not rare enough — turn still lost
+				c.sendJSON(map[string]interface{}{
+					"type": "overtake_failed",
+					"payload": map[string]interface{}{
+						"message":        "Your answer isn't rarer than the existing one",
+						"yourRarity":     result.RarityScore,
+						"existingRarity": existingResult.RarityScore,
+					},
+				})
+			}
+		}
+	} else {
+		// Invalid answer — notify player, turn already advanced
+		log.Printf("Invalid move by user %d ('%s'), turn lost", uid, p.Answer)
+		c.sendJSON(map[string]interface{}{
+			"type": "invalid_move",
+			"payload": map[string]interface{}{
+				"message": result.Message,
+				"answer":  p.Answer,
+			},
+		})
+	}
+
+	log.Printf("Move by user %d, valid=%v, new turn: %d", uid, result.Valid, newTurn)
+
+	// Broadcast updated game state to both players regardless of outcome
+	room.Broadcast(mustMarshal(map[string]interface{}{
+		"type":    "game_state",
+		"payload": room.GameModel,
+	}))
 }
 
 // handleLeaveRoom handles a client leaving a game room.
@@ -545,7 +604,12 @@ func (c *Client) handleLeaveRoom() {
 	room, exists := c.hub.GetRoom(c.currentRoom)
 	if exists {
 		room.RemovePlayer(c.ID)
-		room.Broadcast(mustMarshal(map[string]interface{}{"type": "player_left", "payload": map[string]interface{}{"playerId": c.ID}}))
+		room.Broadcast(mustMarshal(map[string]interface{}{
+			"type": "player_left",
+			"payload": map[string]interface{}{
+				"playerId": c.ID,
+			},
+		}))
 	}
 	c.currentRoom = ""
 	c.hub.BroadcastRoomList()
@@ -563,7 +627,6 @@ func (c *Client) handlePlayerReady(ready bool) {
 		return
 	}
 
-	// Broadcast ready status to everyone in the room
 	room.Broadcast(mustMarshal(map[string]interface{}{
 		"type": "player_ready",
 		"payload": map[string]interface{}{
@@ -573,7 +636,6 @@ func (c *Client) handlePlayerReady(ready bool) {
 		},
 	}))
 
-	// Only send room_ready if ALL players are ready
 	allReady := room.SetReady(c.ID, ready)
 	log.Printf("handlePlayerReady: client %s ready=%v allReady=%v", c.ID, ready, allReady)
 	if allReady {

@@ -11,14 +11,8 @@ func MakeMove(state *models.GameState, userID, row, col int, answer string) (*mo
 		return nil, state.Game.CurrentTurn, errors.New("game is not active")
 	}
 
-	// Check bounds
 	if row < 0 || row >= 3 || col < 0 || col >= 3 {
 		return nil, state.Game.CurrentTurn, errors.New("invalid grid position")
-	}
-
-	// Check if cell already filled
-	if state.Grid[row][col] != nil {
-		return nil, state.Game.CurrentTurn, errors.New("cell already filled")
 	}
 
 	// Check if it's the player's turn
@@ -27,9 +21,6 @@ func MakeMove(state *models.GameState, userID, row, col int, answer string) (*mo
 		return nil, state.Game.CurrentTurn, errors.New("not your turn")
 	}
 
-	// Validate answer (stubbed here, implement actual validation)
-	isValid := true //TODO: implement real answer validation
-
 	move := &models.GameMove{
 		GameID:        state.Game.ID,
 		UserID:        userID,
@@ -37,22 +28,14 @@ func MakeMove(state *models.GameState, userID, row, col int, answer string) (*mo
 		GridCol:       col,
 		PlayerAnswer:  answer,
 		PlayerID:      &userID,
-		IsValid:       isValid,
+		IsValid:       false, // default false, set true if valid
 		MoveTimestamp: time.Now(),
 		Username:      state.Players[playerIdx].Username,
 		PlayerName:    state.Players[playerIdx].Username,
 	}
-	state.Moves = append(state.Moves, *move)
-	state.Grid[row][col] = move
 
-	if isValid {
-		if CheckWin(state, userID) {
-			state.Game.Status = models.GameStatusCompleted
-			state.Game.WinnerID = &userID
-		} else {
-			state.Game.CurrentTurn = (state.Game.CurrentTurn + 1) % len(state.Players)
-		}
-	}
+	// Always advance the turn regardless of validity
+	state.Game.CurrentTurn = (state.Game.CurrentTurn + 1) % len(state.Players)
 
 	return move, state.Game.CurrentTurn, nil
 }

@@ -111,6 +111,25 @@ function handleServerMessage(msg) {
       onMoveMade(msg.payload);
       break;
 
+    case 'invalid_move':
+      showToast('Wrong answer: ' + msg.payload?.answer + ' — turn lost!', 'error');
+      break;
+    
+    case 'cell_overtaken':
+      showToast(
+          msg.payload?.newPlayer + ' overtook ' + msg.payload?.oldPlayer + '!',
+          'success'
+      );
+      break;
+
+    case 'overtake_failed':
+      showToast(
+          'Not rare enough to overtake! (yours: ' +
+          (msg.payload?.yourRarity * 100).toFixed(1) + '% vs existing: ' +
+          (msg.payload?.existingRarity * 100).toFixed(1) + '%)',
+          'error'
+      );
+      break;
     // ── Errors ───────────────────────────────────────────────
     case 'error':
       showToast(msg.message || 'An error occurred', 'error');
