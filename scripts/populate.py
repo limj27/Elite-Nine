@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
 """
 Elite Nine — MLB Data Population Script
 ========================================
@@ -510,30 +509,85 @@ def build_grid_templates(db):
 
 # ═══════════════════════════════════════════════════════════
 # STEP 8 — CALCULATE RARITY SCORES
+# Rarity is based on player accomplishments:
+#   More accomplished = lower rarity score (common/easy to guess)
+#   Less accomplished = higher rarity score (rare/hard to guess)
 # ═══════════════════════════════════════════════════════════
 def calculate_rarity(db):
-    print("\n🎯 Calculating rarity scores...")
+    print("\n🎯 Calculating accomplishment-based rarity scores...")
     cursor = db.cursor()
     try:
+        # Score each player based on weighted accomplishments
         cursor.execute("""
-            UPDATE cell_answers ca
-            JOIN (
-                SELECT mlb_id, COUNT(*) AS appearances
-                FROM cell_answers
-                GROUP BY mlb_id
-            ) counts ON ca.mlb_id = counts.mlb_id
-            JOIN (
-                SELECT MAX(appearances) AS max_appearances
-                FROM (
-                    SELECT mlb_id, COUNT(*) AS appearances
-                    FROM cell_answers
-                    GROUP BY mlb_id
-                ) sub
-            ) maxc ON 1=1
-            SET ca.rarity_score = counts.appearances / maxc.max_appearances
+            SELECT
+                pc.mlb_id,
+                SUM(CASE
+                    WHEN c.label IN ('Hall of Fame', 'AL MVP', 'NL MVP')
+                        THEN 5
+                    WHEN c.label IN ('AL Cy Young', 'NL Cy Young',
+                                     'World Series MVP', 'World Series Champion')
+                        THEN 4
+                    WHEN c.label IN ('AL All-Star', 'NL All-Star',
+                                     'AL Gold Glove', 'NL Gold Glove',
+                                     'AL Silver Slugger', 'NL Silver Slugger')
+                        THEN 3
+                    WHEN c.label IN ('AL Rookie of the Year', 'NL Rookie of the Year')
+                        THEN 2
+                    WHEN c.type = 'stat'  THEN 2
+                    ELSE 1
+                END) AS weighted_score
+            FROM player_criteria pc
+            JOIN criteria c ON pc.criteria_id = c.id
+            GROUP BY pc.mlb_id
         """)
+        rows = cursor.fetchall()
+
+        if not rows:
+            print("  ✗ No player criteria found")
+            return
+
+        max_score = max(r[1] for r in rows)
+        print(f"  Max accomplishment score: {max_score}")
+
+        # rarity = 1 - (weighted_score / max_score)
+        # Most accomplished → rarity near 0 (common)
+        # Least accomplished → rarity near 1 (rare)
+        updated = 0
+        for mlb_id, weighted_score in rows:
+            rarity = round(1.0 - (weighted_score / max_score), 4)
+            cursor.execute("""
+                UPDATE cell_answers SET rarity_score = %s WHERE mlb_id = %s
+            """, (rarity, mlb_id))
+            updated += cursor.rowcount
+
         db.commit()
-        print("  → Rarity scores updated")
+        print(f"  → Updated rarity scores for {len(rows)} players ({updated} cell rows)")
+
+        # Show sample for verification
+        cursor.execute("""
+            SELECT p.full_name, ca.rarity_score
+            FROM cell_answers ca
+            JOIN mlb_players p ON ca.mlb_id = p.mlb_id
+            GROUP BY ca.mlb_id, p.full_name, ca.rarity_score
+            ORDER BY ca.rarity_score ASC
+            LIMIT 5
+        """)
+        print("\n  Most common (easiest to guess):")
+        for row in cursor.fetchall():
+            print(f"    {row[0]:<30} rarity={row[1]:.3f}")
+
+        cursor.execute("""
+            SELECT p.full_name, ca.rarity_score
+            FROM cell_answers ca
+            JOIN mlb_players p ON ca.mlb_id = p.mlb_id
+            GROUP BY ca.mlb_id, p.full_name, ca.rarity_score
+            ORDER BY ca.rarity_score DESC
+            LIMIT 5
+        """)
+        print("\n  Rarest (hardest to guess):")
+        for row in cursor.fetchall():
+            print(f"    {row[0]:<30} rarity={row[1]:.3f}")
+
     except Exception as e:
         print(f"  ✗ Error updating rarity: {e}")
         db.rollback()
