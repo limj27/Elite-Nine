@@ -62,21 +62,21 @@ STAT_CRITERIA = [
 # AWARD CRITERIA
 # ═══════════════════════════════════════════════════════════
 AWARD_CRITERIA = [
-    {"label": "Hall of Fame",          "short_label": "HOF",         "award_id": "MLBHOF",  "start_year": None},
-    {"label": "World Series Champion", "short_label": "WS Champ",    "award_id": "WSCHAMP", "start_year": 1903},
-    {"label": "World Series MVP",      "short_label": "WS MVP",      "award_id": "WSMVP",   "start_year": 1955},
-    {"label": "AL MVP",                "short_label": "AL MVP",      "award_id": "ALMVP",   "start_year": 1931},
-    {"label": "NL MVP",                "short_label": "NL MVP",      "award_id": "NLMVP",   "start_year": 1931},
-    {"label": "AL Cy Young",           "short_label": "AL CYA",      "award_id": "ALCY",    "start_year": 1967},
-    {"label": "NL Cy Young",           "short_label": "NL CYA",      "award_id": "NLCY",    "start_year": 1967},
-    {"label": "AL Rookie of the Year", "short_label": "AL ROY",      "award_id": "ALROY",   "start_year": 1949},
-    {"label": "NL Rookie of the Year", "short_label": "NL ROY",      "award_id": "NLROY",   "start_year": 1947},
-    {"label": "AL All-Star",           "short_label": "AL All-Star", "award_id": "ALAS",    "start_year": 1933},
-    {"label": "NL All-Star",           "short_label": "NL All-Star", "award_id": "NLAS",    "start_year": 1933},
-    {"label": "AL Gold Glove",         "short_label": "AL GG",       "award_id": "ALGG",    "start_year": 1957},
-    {"label": "NL Gold Glove",         "short_label": "NL GG",       "award_id": "NLGG",    "start_year": 1957},
-    {"label": "AL Silver Slugger",     "short_label": "AL SS",       "award_id": "ALSS",    "start_year": 1980},
-    {"label": "NL Silver Slugger",     "short_label": "NL SS",       "award_id": "NLSS",    "start_year": 1980},
+    {"label": "Hall of Fame",          "short_label": "Hall of Fame",       "award_id": "MLBHOF",  "start_year": None},
+    {"label": "World Series Champion", "short_label": "WS Champion",        "award_id": "WSCHAMP", "start_year": 1903},
+    {"label": "World Series MVP",      "short_label": "WS MVP",             "award_id": "WSMVP",   "start_year": 1955},
+    {"label": "AL MVP",                "short_label": "AL MVP",             "award_id": "ALMVP",   "start_year": 1931},
+    {"label": "NL MVP",                "short_label": "NL MVP",             "award_id": "NLMVP",   "start_year": 1931},
+    {"label": "AL Cy Young",           "short_label": "AL Cy Young",        "award_id": "ALCY",    "start_year": 1967},
+    {"label": "NL Cy Young",           "short_label": "NL Cy Young",        "award_id": "NLCY",    "start_year": 1967},
+    {"label": "AL Rookie of the Year", "short_label": "AL Rookie of Year",  "award_id": "ALROY",   "start_year": 1949},
+    {"label": "NL Rookie of the Year", "short_label": "NL Rookie of Year",  "award_id": "NLROY",   "start_year": 1947},
+    {"label": "AL All-Star",           "short_label": "AL All-Star",        "award_id": "ALAS",    "start_year": 1933},
+    {"label": "NL All-Star",           "short_label": "NL All-Star",        "award_id": "NLAS",    "start_year": 1933},
+    {"label": "AL Gold Glove",         "short_label": "AL Gold Glove",      "award_id": "ALGG",    "start_year": 1957},
+    {"label": "NL Gold Glove",         "short_label": "NL Gold Glove",      "award_id": "NLGG",    "start_year": 1957},
+    {"label": "AL Silver Slugger",     "short_label": "AL Silver Slugger",  "award_id": "ALSS",    "start_year": 1980},
+    {"label": "NL Silver Slugger",     "short_label": "NL Silver Slugger",  "award_id": "NLSS",    "start_year": 1980},
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -546,15 +546,15 @@ def calculate_rarity(db):
             print("  ✗ No player criteria found")
             return
 
-        max_score = max(r[1] for r in rows)
+        max_score = float(max(r[1] for r in rows))
         print(f"  Max accomplishment score: {max_score}")
 
-        # rarity = 1 - (weighted_score / max_score)
-        # Most accomplished → rarity near 0 (common)
-        # Least accomplished → rarity near 1 (rare)
+        # rarity = weighted_score / max_score
+        # Most accomplished → rarity near 1.0 (common/easy to guess)
+        # Least accomplished → rarity near 0.0 (rare/hard to guess)
         updated = 0
         for mlb_id, weighted_score in rows:
-            rarity = round(1.0 - (weighted_score / max_score), 4)
+            rarity = round(float(weighted_score) / max_score, 4)
             cursor.execute("""
                 UPDATE cell_answers SET rarity_score = %s WHERE mlb_id = %s
             """, (rarity, mlb_id))

@@ -51,8 +51,8 @@ def get_valid_answers_for_cell(cursor, row_criteria_id, col_criteria_id):
 def calculate_rarity(db):
     """
     Recalculate rarity scores based on player accomplishments.
-    More accomplished = lower rarity score (common/easy to guess)
-    Less accomplished = higher rarity score (rare/hard to guess)
+    More accomplished = higher rarity score (common/easy to guess)
+    Less accomplished = lower rarity score (rare/hard to guess)
     """
     cursor = db.cursor()
     try:
@@ -85,12 +85,14 @@ def calculate_rarity(db):
             print("  ✗ No player criteria found")
             return
 
-        max_score = max(r[1] for r in rows)
+        max_score = float(max(r[1] for r in rows))
 
-        # rarity = 1 - (weighted_score / max_score)
+        # rarity = weighted_score / max_score
+        # Most accomplished → rarity near 1.0 (common/easy to guess)
+        # Least accomplished → rarity near 0.0 (rare/hard to guess)
         updated = 0
         for mlb_id, weighted_score in rows:
-            rarity = round(1.0 - (weighted_score / max_score), 4)
+            rarity = round(float(weighted_score) / max_score, 4)
             cursor.execute("""
                 UPDATE cell_answers SET rarity_score = %s WHERE mlb_id = %s
             """, (rarity, mlb_id))
