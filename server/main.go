@@ -77,6 +77,11 @@ func main() {
 		http.ServeFile(w, r, filepath.Join(clientDir, "index.html"))
 	})
 
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}).Methods("GET")
+
 	// Start server
 	log.Printf("Server starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
