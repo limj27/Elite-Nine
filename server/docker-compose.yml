@@ -83,12 +83,6 @@ services:
     restart: unless-stopped
     networks:
       - baseball_network
-    # Uncomment when you have the Go app ready
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
 
 # Named volumes for data persistence
 volumes:
