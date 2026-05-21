@@ -6,7 +6,8 @@
 
 function connectWebSocket() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const addr  = `${proto}//${location.hostname}:8080/ws?token=${encodeURIComponent(State.token)}`;
+  const port  = location.protocol === 'https:' ? '' : ':8080';
+  const addr  = `${proto}//${location.hostname}${port}/ws?token=${encodeURIComponent(State.token)}`;
 
   window.ws = new WebSocket(addr);
 
