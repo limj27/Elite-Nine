@@ -63,6 +63,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - DATABASE_URL=gameuser:gamepassword@tcp(mysql:3306)/baseball_game?parseTime=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_USER=${MYSQL_USER:-gameuser}
