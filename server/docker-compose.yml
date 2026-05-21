@@ -69,7 +69,7 @@ services:
       - DB_USER=${MYSQL_USER:-gameuser}
       - DB_PASSWORD=${MYSQL_PASSWORD:-gamepassword}
       - DB_NAME=${MYSQL_DATABASE:-baseball_game}
-      - REDIS_URL=redis:6379
+      - REDIS_ADDR=redis:6379
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PORT=8080
