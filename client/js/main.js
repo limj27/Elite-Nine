@@ -24,20 +24,17 @@ const State = {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
-  history.pushState({ screen: id }, '', '/' + (id === 'auth' ? '' : id));
+  const path = id === 'auth' ? '/game/' : `/game/${id}`;
+  history.pushState({ screen: id }, '', path);
 }
 
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (e) => {
   const screen = e.state?.screen;
-
-  // Back to auth = log out
   if (!screen || screen === 'auth') {
     handleLogout();
     return;
   }
-
-  // Back to lobby from game = leave room cleanly
   if (screen === 'lobby') {
     if (State.gameStarted || State.currentRoom) {
       wsSend('leave_room', {});
@@ -51,8 +48,6 @@ window.addEventListener('popstate', (e) => {
     requestRoomList();
     return;
   }
-
-  // Fallback — just show whatever screen the state says
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + screen).classList.add('active');
 });
@@ -84,7 +79,6 @@ window.addEventListener('load', () => {
     showScreen('lobby');
     connectWebSocket();
   } else {
-    // Set base history entry so back button has somewhere to land
-    history.replaceState({ screen: 'auth' }, '', '/');
+    history.replaceState({ screen: 'auth' }, '', '/game/');
   }
 });
