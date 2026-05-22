@@ -80,14 +80,17 @@ func (h *Hub) Run() {
 
 // removeClientFromRooms removes a client from all game rooms they are part of.
 func (h *Hub) removeClientFromRooms(client *Client) {
+	// Get rooms to check first (avoid holding lock during room operations)
 	h.mu.RLock()
-	roomsToCheck := make([]*GameRoom, 0, len(h.rooms))
+	roomsToCheck := make([]*GameRoom, 0)
 	for _, room := range h.rooms {
 		roomsToCheck = append(roomsToCheck, room)
 	}
 	h.mu.RUnlock()
 
-	emptyRooms := make([]string, 0)
+	// Process rooms without holding hub lock
+	emptyRoomIDs := make([]string, 0)
+
 	for _, room := range roomsToCheck {
 		if room.RemovePlayer(client.ID) {
 			leaveMsg := Message{
@@ -99,26 +102,37 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 			}
 			room.Broadcast(leaveMsg.ToJSON())
 
+			// Check if room is now empty
 			room.mu.RLock()
-			if len(room.Players) == 0 {
-				emptyRooms = append(emptyRooms, room.ID)
-			}
+			playerCount := len(room.Players)
 			room.mu.RUnlock()
+
+			if playerCount == 0 {
+				emptyRoomIDs = append(emptyRoomIDs, room.ID)
+				log.Printf("Room %s is empty, marking for deletion", room.ID)
+			}
 		}
 	}
 
-	// Remove empty rooms with hub lock
-	if len(emptyRooms) > 0 {
+	// Remove empty rooms
+	if len(emptyRoomIDs) > 0 {
 		h.mu.Lock()
-		for _, roomID := range emptyRooms {
-			delete(h.rooms, roomID)
-			log.Printf("Room %s removed due to no players", roomID)
+		for _, roomID := range emptyRoomIDs {
+			if room, exists := h.rooms[roomID]; exists {
+				delete(h.rooms, roomID)
+				log.Printf("Room %s deleted (no players)", roomID)
+
+				// Clean up from GameManager if needed
+				if room.GameManager != nil && room.GameID > 0 {
+					room.GameManager.RemoveGameRoom(room.GameID)
+				}
+			}
 		}
 		h.mu.Unlock()
-	}
 
-	// Notify all clients of updated room list
-	h.BroadcastRoomList()
+		// Broadcast updated room list
+		h.BroadcastRoomList()
+	}
 }
 
 func (h *Hub) AddRoom(room *GameRoom) {

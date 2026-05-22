@@ -2,6 +2,8 @@ package websocket
 
 import (
 	"errors"
+	"log"
+	"strconv"
 	"sync"
 	"time"
 	"trivia-server/models"
@@ -32,12 +34,20 @@ type GameRoom struct {
 	GameManager    *GameManager
 	GameStatus     string
 	GridTemplateID int
+
+	RematchRequests map[string]bool // playerID -> accepted
+	rematchMu       sync.Mutex
 }
 
 type GameState struct {
 	Status      string `json:"status"`
 	PlayerCount int    `json:"player_count"`
 	MaxPlayers  int    `json:"max_players"`
+}
+
+type RematchRequest struct {
+	PlayerID string
+	Accepted bool
 }
 
 func NewGameRoom(id, name, password, creatorID string) *GameRoom {
@@ -54,7 +64,8 @@ func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 			PlayerCount: 0,
 			MaxPlayers:  2, // default
 		},
-		CreatedAt: time.Now(),
+		CreatedAt:       time.Now(),
+		RematchRequests: make(map[string]bool),
 	}
 }
 
@@ -183,6 +194,53 @@ func (r *GameRoom) SetReady(clientID string, ready bool) bool {
 	return readyCount == playerCount && playerCount == r.State.MaxPlayers
 }
 
+func (r *GameRoom) EndGame(winnerID int) {
+	r.mu.Lock()
+	r.GameStatus = "completed"
+	r.State.Status = "completed"
+
+	var winnerUsername string
+	var isDraw bool
+
+	if winnerID == 0 {
+		isDraw = true
+		winnerUsername = "Draw"
+	} else {
+		// Get winner info
+		for _, client := range r.Players {
+			uid, _ := strconv.Atoi(client.userID)
+			if uid == winnerID {
+				winnerUsername = client.username
+				break
+			}
+		}
+	}
+	r.mu.Unlock()
+
+	// Broadcast game ended
+	payload := map[string]interface{}{
+		"room_id":     r.ID,
+		"final_state": r.GameModel,
+		"is_draw":     isDraw,
+	}
+
+	if !isDraw {
+		payload["winner_id"] = winnerID
+		payload["winner_username"] = winnerUsername
+	}
+
+	r.Broadcast(mustMarshal(map[string]interface{}{
+		"type":    "game_ended",
+		"payload": payload,
+	}))
+
+	if isDraw {
+		log.Printf("Game ended in draw in room %s", r.ID)
+	} else {
+		log.Printf("Game ended in room %s, winner: %s (ID: %d)", r.ID, winnerUsername, winnerID)
+	}
+}
+
 func (r *GameRoom) Broadcast(message []byte) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -212,12 +270,6 @@ func (r *GameRoom) GetOrderedClients() []*Client {
 func (r *GameRoom) Close() {
 	r.mu.Lock()
 	r.State.Status = "closed"
-	// collect clients before unlocking
-	clients := make([]*Client, 0, len(r.Players))
-	for _, client := range r.Players {
-		clients = append(clients, client)
-	}
-	r.mu.Unlock() // release BEFORE broadcasting
 
 	closeMsg := Message{
 		Type: "room_closed",
@@ -225,9 +277,64 @@ func (r *GameRoom) Close() {
 			"roomId": r.ID,
 		},
 	}
-	r.Broadcast(closeMsg.ToJSON())
 
-	for _, client := range clients {
-		client.Close()
+	// Get client list before broadcasting
+	clients := make([]*Client, 0, len(r.Players))
+	for _, client := range r.Players {
+		clients = append(clients, client)
 	}
+	r.mu.Unlock()
+
+	// Broadcast without holding lock
+	msgBytes := closeMsg.ToJSON()
+	for _, client := range clients {
+		select {
+		case client.send <- msgBytes:
+		default:
+		}
+	}
+
+	// Note: Don't close clients here - let them disconnect naturally
+	// Closing the client connection should be handled by the hub
+	log.Printf("Room %s closed", r.ID)
+}
+
+func (r *GameRoom) RequestRematch(clientID string) (bool, error) {
+	r.rematchMu.Lock()
+	defer r.rematchMu.Unlock()
+
+	r.mu.RLock()
+	playerCount := len(r.Players)
+	gameStatus := r.GameStatus
+	r.mu.RUnlock()
+
+	if gameStatus != "completed" && gameStatus != "finished" {
+		return false, errors.New("game not finished")
+	}
+
+	// Mark this player as accepting rematch
+	r.RematchRequests[clientID] = true
+
+	// Check if all players have accepted
+	if len(r.RematchRequests) == playerCount {
+		return true, nil // All players ready for rematch
+	}
+
+	return false, nil // Waiting for other players
+}
+
+func (r *GameRoom) ResetForRematch() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.rematchMu.Lock()
+	r.RematchRequests = make(map[string]bool)
+	r.rematchMu.Unlock()
+
+	r.GameModel = nil
+	r.GameID = 0
+	r.State.Status = "ready"
+	r.GameStatus = "waiting"
+
+	log.Printf("Room %s reset for rematch", r.ID)
 }

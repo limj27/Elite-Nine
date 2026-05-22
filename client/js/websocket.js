@@ -78,7 +78,17 @@ function handleServerMessage(msg) {
         showToast('Both players ready! You can start the game.', 'success');
       }
       break;
+    case 'game_ended':
+        onGameEnded(msg.payload);
+        break;
 
+    case 'rematch_requested':
+        showToast(`${msg.payload?.username} wants a rematch!`, 'success');
+        break;
+
+    case 'rematch_ready':
+        onRematchReady();
+        break;
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':
       if (msg.payload?.playerIndex !== undefined) {

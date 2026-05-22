@@ -114,13 +114,6 @@ function onGameState(payload) {
     buildGrid();
   }
 
-  // Check for game over
-  if (payload?.game?.status === 'completed' && payload?.game?.winner_id) {
-    updateGridFromState(payload.grid);
-    setTimeout(() => showWinScreen(payload.game.winner_id), 500);
-    return;
-  }
-
   if (payload?.game?.current_turn !== undefined) {
     updateTurnBar(payload.game.current_turn);
   }
@@ -367,28 +360,115 @@ function selectPlayer(encoded) {
 // Win Screen
 // ═══════════════════════════════════════════════════════════
 function showWinScreen(winnerId) {
-  const isWinner = State.players?.find(p => p.user_id === winnerId)?.user_id === 
-    State.players?.[State.playerIndex]?.user_id;
-  
-  const message = isWinner ? '🏆 You Win!' : '😔 You Lose!';
-  const color   = isWinner ? 'var(--green)' : 'var(--red)';
+    const isWinner = State.players?.find(p => p.user_id === winnerId)?.user_id ===
+        State.players?.[State.playerIndex]?.user_id;
 
-  // Overlay on top of the grid
-  const overlay = document.createElement('div');
-  overlay.id = 'win-overlay';
-  overlay.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; z-index: 500; gap: 20px;
-  `;
-  overlay.innerHTML = `
-    <div style="font-family: var(--font-display); font-size: 72px; color: ${color}; letter-spacing: 4px;">
-      ${message}
-    </div>
-    <div style="font-size: 16px; color: var(--text2);">Game over</div>
-    <button class="btn btn-primary" style="width:200px;" onclick="handleLeaveRoom()">
-      Back to Lobby
-    </button>
-  `;
-  document.body.appendChild(overlay);
+    const message = isWinner ? '🏆 You Win!' : '😔 You Lose!';
+    const color   = isWinner ? 'var(--green)' : 'var(--red)';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'win-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; z-index: 500; gap: 20px;
+    `;
+    overlay.innerHTML = `
+        <div style="font-family: var(--font-display); font-size: 72px; color: ${color}; letter-spacing: 4px;">
+            ${message}
+        </div>
+        <div style="font-size: 16px; color: var(--text2);">Game over</div>
+        <div style="display:flex; gap:12px;">
+            <button class="btn btn-primary" style="width:200px;" onclick="handleRematchRequest()" id="rematch-btn">
+                🔁 Rematch
+            </button>
+            <button class="btn btn-outline" style="width:200px;" onclick="handleLeaveRoom()">
+                Back to Lobby
+            </button>
+        </div>
+        <div id="rematch-status" style="font-size:14px; color:var(--text2);"></div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAME END & REMATCH
+// ═══════════════════════════════════════════════════════════
+
+function onGameEnded(payload) {
+    // Update grid one final time
+    if (payload?.final_state?.grid) {
+        updateGridFromState(payload.final_state.grid);
+    }
+
+    setTimeout(() => {
+        if (payload?.is_draw) {
+            showDrawScreen();
+        } else {
+            showWinScreen(payload?.winner_id);
+        }
+    }, 500);
+}
+
+function showDrawScreen() {
+    const overlay = document.createElement('div');
+    overlay.id = 'win-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; z-index: 500; gap: 20px;
+    `;
+    overlay.innerHTML = `
+        <div style="font-family: var(--font-display); font-size: 72px; color: var(--text2); letter-spacing: 4px;">
+            🤝 Draw!
+        </div>
+        <div style="font-size: 16px; color: var(--text2);">No winner this time</div>
+        <div style="display:flex; gap:12px;">
+            <button class="btn btn-primary" style="width:200px;" onclick="handleRematchRequest()" id="rematch-btn">
+                🔁 Rematch
+            </button>
+            <button class="btn btn-outline" style="width:200px;" onclick="handleLeaveRoom()">
+                Back to Lobby
+            </button>
+        </div>
+        <div id="rematch-status" style="font-size:14px; color:var(--text2);"></div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function handleRematchRequest() {
+    wsSend('request_rematch', {});
+
+    // Update button to show waiting
+    const btn = document.getElementById('rematch-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Waiting for opponent...';
+    }
+
+    const status = document.getElementById('rematch-status');
+    if (status) {
+        status.textContent = 'Rematch request sent!';
+    }
+}
+
+function onRematchReady() {
+    // Remove win overlay
+    const overlay = document.getElementById('win-overlay');
+    if (overlay) overlay.remove();
+
+    // Reset game state
+    State.gameStarted = false;
+    State.myReady     = false;
+    State.oppReady    = false;
+
+    // Reset UI back to waiting state
+    document.getElementById('waiting-state').style.display = 'block';
+    document.getElementById('grid-wrap').style.display     = 'none';
+    document.getElementById('ready-section').style.display = 'flex';
+    document.getElementById('start-btn').disabled          = true;
+    document.getElementById('ready-btn').textContent       = 'Mark Ready';
+
+    updateReadyUI();
+    showToast('Rematch! Get ready!', 'success');
 }
