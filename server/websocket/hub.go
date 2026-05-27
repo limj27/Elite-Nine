@@ -107,6 +107,8 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 			playerCount := len(room.Players)
 			room.mu.RUnlock()
 
+			log.Printf("Room %s has %d players after removal", room.ID, playerCount)
+
 			if playerCount == 0 {
 				emptyRoomIDs = append(emptyRoomIDs, room.ID)
 				log.Printf("Room %s is empty, marking for deletion", room.ID)
@@ -129,8 +131,6 @@ func (h *Hub) removeClientFromRooms(client *Client) {
 			}
 		}
 		h.mu.Unlock()
-
-		// Broadcast updated room list
 		h.BroadcastRoomList()
 	}
 }

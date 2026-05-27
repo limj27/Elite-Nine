@@ -82,12 +82,27 @@ function handleServerMessage(msg) {
         onGameEnded(msg.payload);
         break;
 
-    case 'rematch_requested':
-        showToast(`${msg.payload?.username} wants a rematch!`, 'success');
-        break;
+    case 'rematch':
+        // Reset game state and go back to ready screen
+        State.gameStarted = false;
+        State.myReady     = false;
+        State.oppReady    = false;
+        State.playerIndex = 0;
+        State.gridTemplate = null;
 
-    case 'rematch_ready':
-        onRematchReady();
+        const overlay = document.getElementById('win-overlay');
+        if (overlay) overlay.remove();
+
+        // Show waiting state again
+        document.getElementById('waiting-state').style.display = 'block';
+        document.getElementById('grid-wrap').style.display     = 'none';
+        document.getElementById('ready-section').style.display = 'flex';
+        document.getElementById('start-btn').disabled          = true;
+        document.getElementById('ready-btn').textContent       = 'Mark Ready';
+
+        // Reset ready UI
+        updateReadyUI();
+        showToast('Rematch started — mark ready to play again!', 'success');
         break;
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':

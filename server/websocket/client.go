@@ -213,8 +213,8 @@ func (c *Client) handleMessage(msg wsMessage) {
 			return
 		}
 		c.handlePlayerReady(p.Ready)
-	case "request_rematch":
-		c.handleRequestRematch()
+	case "rematch":
+		c.handleRematch()
 	default:
 		c.sendError("unknown message type")
 	}
@@ -498,66 +498,102 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
+	// Validate the answer against the grid template
+	gridSvc := grid.NewService(c.hub.DB)
+	result, err := gridSvc.ValidateAnswer(room.GridTemplateID, p.Row, p.Col, p.PlayerID, p.Answer)
+	if err != nil {
+		log.Printf("Validation error: %v", err)
+		c.sendError("validation error")
+		return
+	}
+
+	// Always make the move — turn advances regardless of answer validity
 	move, newTurn, err := game.MakeMove(room.GameModel, uid, p.Row, p.Col, p.Answer)
 	if err != nil {
 		c.sendError(err.Error())
 		return
 	}
 
-	// ✅ ADD: Place the move on the grid (you need to validate answer first)
-	// For now, assuming answer is correct - you'll need to add question validation
-	isCorrect := validateAnswer(p.Answer, p.Row, p.Col) // You need to implement this
-	if isCorrect {
+	if result.Valid {
 		move.IsValid = true
-		room.GameModel.Grid[p.Row][p.Col] = move
-		room.GameModel.Moves = append(room.GameModel.Moves, *move)
+		move.PlayerName = result.Answer.PlayerName
+		move.Headshot = result.Answer.HeadshotURL
+
+		existingMove := room.GameModel.Grid[p.Row][p.Col]
+
+		if existingMove == nil {
+			// Empty cell — place it and check for win
+			room.GameModel.Grid[p.Row][p.Col] = move
+
+			if game.CheckWin(room.GameModel, uid) {
+				room.GameModel.Game.Status = models.GameStatusCompleted
+				room.GameModel.Game.WinnerID = &uid
+			}
+
+		} else {
+			// Cell occupied — check rarity to determine overtake
+			existingResult, err := gridSvc.ValidateAnswer(
+				room.GridTemplateID, p.Row, p.Col,
+				*existingMove.PlayerID, existingMove.PlayerAnswer,
+			)
+
+			canOvertake := false
+			if err != nil || !existingResult.Valid {
+				canOvertake = true
+			} else {
+				// Lower rarity score = rarer = can overtake higher score
+				canOvertake = result.RarityScore < existingResult.RarityScore
+			}
+
+			if canOvertake {
+				room.GameModel.Grid[p.Row][p.Col] = move
+
+				if game.CheckWin(room.GameModel, uid) {
+					room.GameModel.Game.Status = models.GameStatusCompleted
+					room.GameModel.Game.WinnerID = &uid
+				}
+
+				room.Broadcast(mustMarshal(map[string]interface{}{
+					"type": "cell_overtaken",
+					"payload": map[string]interface{}{
+						"row":         p.Row,
+						"col":         p.Col,
+						"newPlayer":   result.Answer.PlayerName,
+						"oldPlayer":   existingMove.PlayerName,
+						"rarityScore": result.RarityScore,
+					},
+				}))
+			} else {
+				// Valid answer but not rare enough — turn still lost
+				c.sendJSON(map[string]interface{}{
+					"type": "overtake_failed",
+					"payload": map[string]interface{}{
+						"message":        "Your answer isn't rarer than the existing one",
+						"yourRarity":     result.RarityScore,
+						"existingRarity": existingResult.RarityScore,
+					},
+				})
+			}
+		}
+	} else {
+		// Invalid answer — notify player, turn already advanced
+		log.Printf("Invalid move by user %d ('%s'), turn lost", uid, p.Answer)
+		c.sendJSON(map[string]interface{}{
+			"type": "invalid_move",
+			"payload": map[string]interface{}{
+				"message": result.Message,
+				"answer":  p.Answer,
+			},
+		})
 	}
 
-	// Broadcast updated game state to room
+	log.Printf("Move by user %d, valid=%v, new turn: %d", uid, result.Valid, newTurn)
+
+	// Broadcast updated game state to both players regardless of outcome
 	room.Broadcast(mustMarshal(map[string]interface{}{
 		"type":    "game_state",
 		"payload": room.GameModel,
 	}))
-
-	// Broadcast the single move event
-	room.Broadcast(mustMarshal(map[string]interface{}{
-		"type":      "move_made",
-		"payload":   move,
-		"next_turn": newTurn,
-	}))
-
-	// ✅ CHECK WIN CONDITION AFTER VALID MOVE
-	if isCorrect && game.CheckWin(room.GameModel, uid) {
-		room.GameModel.Game.Status = models.GameStatusCompleted
-		room.EndGame(uid)
-		return
-	}
-
-	// ✅ CHECK FOR DRAW (grid full, no winner)
-	if isGridFull(room.GameModel.Grid) {
-		room.GameModel.Game.Status = models.GameStatusCompleted
-		room.EndGame(0) // 0 = draw/tie
-		return
-	}
-}
-
-// Helper function to check if grid is full
-func isGridFull(grid [3][3]*models.GameMove) bool {
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
-			if grid[i][j] == nil {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// Placeholder for answer validation - you need to implement this based on your questions
-func validateAnswer(answer string, row, col int) bool {
-	// TODO: Fetch the question for this grid position and check if answer is correct
-	// For now, return true for testing
-	return true
 }
 
 // handleLeaveRoom handles a client leaving a game room.
@@ -569,11 +605,21 @@ func (c *Client) handleLeaveRoom() {
 	if exists {
 		room.RemovePlayer(c.ID)
 		room.Broadcast(mustMarshal(map[string]interface{}{
-			"type": "player_left",
-			"payload": map[string]interface{}{
-				"playerId": c.ID,
-			},
+			"type":    "player_left",
+			"payload": map[string]interface{}{"playerId": c.ID},
 		}))
+
+		// Delete room from hub if empty
+		room.mu.RLock()
+		playerCount := len(room.Players)
+		room.mu.RUnlock()
+
+		if playerCount == 0 {
+			c.hub.mu.Lock()
+			delete(c.hub.rooms, c.currentRoom)
+			c.hub.mu.Unlock()
+			log.Printf("Room %s deleted after last player left", c.currentRoom)
+		}
 	}
 	c.currentRoom = ""
 	c.hub.BroadcastRoomList()
@@ -610,7 +656,7 @@ func (c *Client) handlePlayerReady(ready bool) {
 	}
 }
 
-func (c *Client) handleRequestRematch() {
+func (c *Client) handleRematch() {
 	if c.currentRoom == "" {
 		c.sendError("not in a room")
 		return
@@ -622,40 +668,23 @@ func (c *Client) handleRequestRematch() {
 		return
 	}
 
-	allReady, err := room.RequestRematch(c.ID)
-	if err != nil {
-		c.sendError(err.Error())
-		return
+	// Reset ready states and game model
+	room.mu.Lock()
+	for k := range room.readyPlayers {
+		room.readyPlayers[k] = false
 	}
+	room.State.Status = "waiting"
+	room.GameModel = nil
+	room.GameStatus = ""
+	room.mu.Unlock()
 
-	// Notify room that this player wants rematch
+	// Notify all players to go back to ready screen
 	room.Broadcast(mustMarshal(map[string]interface{}{
-		"type": "rematch_requested",
-		"payload": map[string]interface{}{
-			"player_id": c.ID,
-			"username":  c.username,
-		},
+		"type":    "rematch",
+		"payload": map[string]interface{}{"roomId": room.ID},
 	}))
 
-	if allReady {
-		// All players ready - reset and start new game
-		room.ResetForRematch()
-
-		room.Broadcast(mustMarshal(map[string]interface{}{
-			"type": "rematch_ready",
-			"payload": map[string]interface{}{
-				"room_id": room.ID,
-			},
-		}))
-
-		room.Broadcast(mustMarshal(map[string]interface{}{
-			"type": "room_ready",
-			"payload": map[string]interface{}{
-				"room_id": room.ID,
-				"message": "All players ready for rematch",
-			},
-		}))
-	}
+	log.Printf("Rematch requested in room %s", room.ID)
 }
 
 func (c *Client) Close() {
