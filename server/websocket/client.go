@@ -527,7 +527,8 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 
 			if game.CheckWin(room.GameModel, uid) {
 				room.GameModel.Game.Status = models.GameStatusCompleted
-				room.GameModel.Game.WinnerID = &uid
+				winnerID := uid                          // copy to new variable
+				room.GameModel.Game.WinnerID = &winnerID // safe pointer
 			}
 
 		} else {
@@ -550,7 +551,8 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 
 				if game.CheckWin(room.GameModel, uid) {
 					room.GameModel.Game.Status = models.GameStatusCompleted
-					room.GameModel.Game.WinnerID = &uid
+					winnerID := uid                          // copy to new variable
+					room.GameModel.Game.WinnerID = &winnerID // safe pointer
 				}
 
 				room.Broadcast(mustMarshal(map[string]interface{}{

@@ -105,13 +105,19 @@ function handleStartGame() {
 // ── Game state updates ───────────────────────────────────────
 
 function onGameState(payload) {
-  // Build grid if not already built (fallback)
   if (!State.gameStarted) {
     State.gameStarted = true;
     document.getElementById('waiting-state').style.display = 'none';
     document.getElementById('grid-wrap').style.display     = 'flex';
     document.getElementById('ready-section').style.display = 'none';
     buildGrid();
+  }
+
+  // Check for game over — must come before turn update
+  if (payload?.game?.status === 'completed' && payload?.game?.winner_id) {
+    if (payload?.grid) updateGridFromState(payload.grid);
+    setTimeout(() => showWinScreen(payload.game.winner_id), 500);
+    return;
   }
 
   if (payload?.game?.current_turn !== undefined) {
