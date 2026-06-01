@@ -16,5 +16,5 @@ Things to Implement:
 - Replay ability
 - Change the color of ready button
 - Turn Timer (Feature to select when making the room)
-- Replace Team Name with logos
+- The left column of Logos is upside down
 - Notification when it's your turn
