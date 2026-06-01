@@ -18,4 +18,3 @@ Things to Implement:
 - Turn Timer (Feature to select when making the room)
 - Replace Team Name with logos
 - Notification when it's your turn
-- Delete room when no one is in it

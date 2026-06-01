@@ -16,6 +16,7 @@ type Criteria struct {
 	Type       string `json:"type"`
 	Label      string `json:"label"`
 	ShortLabel string `json:"short_label"`
+	MlbTeamID  *int   `json:"mlb_team_id,omitempty"` // optional, only for team-based criteria
 }
 
 type GridTemplate struct {
@@ -109,9 +110,10 @@ func (s *Service) GetRandomGrid() (*GridTemplate, error) {
 func (s *Service) getCriteria(id int) (*Criteria, error) {
 	c := &Criteria{}
 	err := s.db.QueryRow(`
-		SELECT id, type, label, COALESCE(short_label, label)
+		SELECT id, type, label, COALESCE(short_label, label),
+				mlb_team_id
 		FROM criteria WHERE id = ?
-	`, id).Scan(&c.ID, &c.Type, &c.Label, &c.ShortLabel)
+	`, id).Scan(&c.ID, &c.Type, &c.Label, &c.ShortLabel, &c.MlbTeamID)
 	if err != nil {
 		return nil, fmt.Errorf("criteria %d not found: %w", id, err)
 	}

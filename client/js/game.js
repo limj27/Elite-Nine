@@ -261,16 +261,36 @@ function renderGridHeaders() {
 
     const { rowCriteria, colCriteria } = State.gridTemplate;
 
-    // Update column headers
     colCriteria.forEach((crit, i) => {
         const el = document.getElementById('col-header-' + i);
-        if (el) el.textContent = crit.short_label || crit.label;
+        if (!el) return;
+        if (crit.type === 'team' && crit.mlb_team_id) {
+            el.innerHTML = `
+                <img 
+                    src="https://www.mlbstatic.com/team-logos/${crit.mlb_team_id}.svg"
+                    alt="${crit.short_label}"
+                    style="width:48px;height:48px;object-fit:contain;"
+                    onerror="this.outerHTML='<span>${crit.short_label}</span>'"
+                >`;
+        } else {
+            el.textContent = crit.short_label || crit.label;
+        }
     });
 
-    // Update row headers
     rowCriteria.forEach((crit, i) => {
         const el = document.getElementById('row-header-' + i);
-        if (el) el.textContent = crit.short_label || crit.label;
+        if (!el) return;
+        if (crit.type === 'team' && crit.mlb_team_id) {
+            el.innerHTML = `
+                <img
+                    src="https://www.mlbstatic.com/team-logos/${crit.mlb_team_id}.svg"
+                    alt="${crit.short_label}"
+                    style="width:48px;height:48px;object-fit:contain;"
+                    onerror="this.outerHTML='<span>${crit.short_label}</span>'"
+                >`;
+        } else {
+            el.textContent = crit.short_label || crit.label;
+        }
     });
 }
 
