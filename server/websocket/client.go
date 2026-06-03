@@ -519,6 +519,28 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		move.PlayerName = result.Answer.PlayerName
 		move.Headshot = result.Answer.HeadshotURL
 
+		// Check if this player is already used anywhere in the grid
+		for row := 0; row < 3; row++ {
+			for col := 0; col < 3; col++ {
+				existing := room.GameModel.Grid[row][col]
+				if existing != nil && existing.PlayerID != nil && *existing.PlayerID == p.PlayerID {
+					c.sendJSON(map[string]interface{}{
+						"type": "invalid_move",
+						"payload": map[string]interface{}{
+							"message": result.Answer.PlayerName + " is already used in the grid",
+							"answer":  p.Answer,
+						},
+					})
+					// Broadcast game state so turn still shows correctly
+					room.Broadcast(mustMarshal(map[string]interface{}{
+						"type":    "game_state",
+						"payload": room.GameModel,
+					}))
+					return
+				}
+			}
+		}
+
 		existingMove := room.GameModel.Grid[p.Row][p.Col]
 
 		if existingMove == nil {
