@@ -65,6 +65,7 @@ type GameMove struct {
 	IsValid       bool      `json:"is_valid" db:"is_valid"`
 	MoveTimestamp time.Time `json:"move_timestamp" db:"move_timestamp"`
 	Headshot      string    `json:"headshot,omitempty"`
+	MLBPlayerID   int       `json:"mlb_player_id,omitempty"`
 
 	// Joined fields
 	Username   string `json:"username,omitempty"`
