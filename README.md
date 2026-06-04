@@ -15,3 +15,4 @@
 - Change the color of ready button
 - Turn Timer (Feature to select when making the room)
 - Notification when it's your turn
+- Display proper error message

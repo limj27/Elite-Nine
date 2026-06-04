@@ -138,7 +138,7 @@ function handleServerMessage(msg) {
       break;
 
     case 'invalid_move':
-      showToast('Wrong answer: ' + msg.payload?.answer + ' — turn lost!', 'error');
+      showToast(msg.payload?.message || 'Wrong answer — turn lost!', 'error');
       break;
     
     case 'cell_overtaken':

@@ -141,15 +141,61 @@ function onMoveMade(payload) {
   renderCell(payload.cell_index);
 }
 
+function showTurnNotification() {
+  // Remove any existing notification
+  const existing = document.getElementById('turn-notification');
+  if (existing) existing.remove();
+
+  const notif = document.createElement('div');
+  notif.id = 'turn-notification';
+  notif.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: var(--blue);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 48px;
+    letter-spacing: 3px;
+    padding: 24px 48px;
+    border-radius: 16px;
+    z-index: 400;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    text-align: center;
+  `;
+  notif.textContent = "YOUR TURN";
+  document.body.appendChild(notif);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    notif.style.opacity = '1';
+    notif.style.transform = 'translate(-50%, -50%) scale(1)';
+  });
+
+  // Animate out after 1.5 seconds
+  setTimeout(() => {
+    notif.style.opacity = '0';
+    notif.style.transform = 'translate(-50%, -50%) scale(0.8)';
+    setTimeout(() => notif.remove(), 200);
+  }, 1500);
+}
+
 function updateTurnBar(currentTurn) {
-  console.log('updateTurnBar — currentTurn:', currentTurn, 'playerIndex:', State.playerIndex, 'myTurn:', currentTurn === State.playerIndex);
+  const wasMyTurn = State.myTurn;
   State.myTurn = currentTurn === State.playerIndex;
   const text = State.myTurn ? 'Your turn' : "Opponent's turn";
-  console.log('setting turn text to:', text);
   document.getElementById('turn-text').textContent = text;
   document.getElementById('turn-bar').style.borderColor = State.myTurn
     ? 'rgba(59,130,246,0.5)'
     : 'rgba(239,68,68,0.3)';
+
+  // Show notification only when turn switches TO you (not on initial load)
+  if (State.myTurn && !wasMyTurn && State.gameStarted) {
+    showTurnNotification();
+  }
 }
 
 function updateGridFromState(grid) {
