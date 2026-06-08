@@ -233,7 +233,9 @@ function handleLeaveRoom() {
   State.oppReady     = false;
   State.playerIndex  = 0;
   const overlay = document.getElementById('win-overlay');
-  if (overlay) overlay.remove();   // add this
+  if (overlay) overlay.remove();
+  const historySection = document.getElementById('cell-history-section');
+  if (historySection) historySection.remove();
   showScreen('lobby');
   requestRoomList();
 }
@@ -295,7 +297,7 @@ function renderCell(idx) {
 function onCellClick(idx) {
   if (!State.gameStarted) return;
 
-  // Always show history on click
+  // Always update sidebar history
   showCellHistory(idx);
 
   if (!State.myTurn) {
@@ -349,89 +351,60 @@ function showCellHistory(idx) {
   const col = idx % 3;
   const history = State.cellHistory?.[row]?.[col];
 
-  // Remove existing history panel
-  const existing = document.getElementById('cell-history-panel');
-  if (existing) {
-    existing.remove();
-    return; // toggle off if same cell clicked twice
-  }
-
-  if (!history || history.length === 0) {
-    showToast('No attempts yet for this cell', '');
-    return;
-  }
-
-  const panel = document.createElement('div');
-  panel.id = 'cell-history-panel';
-  panel.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    border-radius: 14px;
-    padding: 20px;
-    z-index: 300;
-    min-width: 300px;
-    max-width: 400px;
-    max-height: 400px;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-  `;
-
   const rowLabel = State.gridTemplate?.rowCriteria?.[row]?.short_label || `Row ${row + 1}`;
   const colLabel = State.gridTemplate?.colCriteria?.[col]?.short_label || `Col ${col + 1}`;
 
-  panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div>
-        <div style="font-family:var(--font-display);font-size:18px;letter-spacing:1px;">
-          Cell History
-        </div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px;">
-          ${rowLabel} × ${colLabel}
-        </div>
+  // Find or create the history section in the sidebar
+  let historySection = document.getElementById('cell-history-section');
+  if (!historySection) {
+    historySection = document.createElement('div');
+    historySection.id = 'cell-history-section';
+    // Insert into game sidebar after the divider
+    const sidebar = document.querySelector('.game-sidebar');
+    if (sidebar) sidebar.appendChild(historySection);
+  }
+
+  if (!history || history.length === 0) {
+    historySection.innerHTML = `
+      <div class="divider"></div>
+      <div class="player-card-label">CELL HISTORY</div>
+      <div style="font-size:12px;color:var(--text3);padding:8px 0;">
+        ${rowLabel} × ${colLabel}<br>
+        No attempts yet
       </div>
-      <button onclick="document.getElementById('cell-history-panel').remove()"
-        style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">✕</button>
+    `;
+    return;
+  }
+
+  historySection.innerHTML = `
+    <div class="divider"></div>
+    <div class="player-card-label">CELL HISTORY</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">
+      ${rowLabel} × ${colLabel}
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;">
       ${history.map(attempt => `
         <div style="
-          display:flex;align-items:center;justify-content:space-between;
-          padding:10px 12px;
+          padding:8px 10px;
           background:${attempt.valid ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'};
           border:1px solid ${attempt.valid ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};
           border-radius:8px;
         ">
-          <div>
-            <div style="font-size:14px;font-weight:600;color:var(--text);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:12px;font-weight:600;color:var(--text);">
               ${attempt.player_name}
             </div>
-            <div style="font-size:11px;color:var(--text2);">
-              by ${attempt.username}
+            <div style="font-size:10px;font-weight:600;color:${attempt.valid ? 'var(--green)' : 'var(--red)'};">
+              ${attempt.valid ? '✓' : '✗'}
             </div>
           </div>
-          <div style="font-size:12px;font-weight:600;color:${attempt.valid ? 'var(--green)' : 'var(--red)'};">
-            ${attempt.valid ? '✓ Valid' : '✗ Invalid'}
+          <div style="font-size:10px;color:var(--text2);margin-top:2px;">
+            by ${attempt.username}
           </div>
         </div>
       `).join('')}
     </div>
   `;
-
-  document.body.appendChild(panel);
-
-  // Close when clicking outside
-  setTimeout(() => {
-    document.addEventListener('click', function closePanel(e) {
-      if (!panel.contains(e.target)) {
-        panel.remove();
-        document.removeEventListener('click', closePanel);
-      }
-    });
-  }, 100);
 }
 
 // ═══════════════════════════════════════════════════════════

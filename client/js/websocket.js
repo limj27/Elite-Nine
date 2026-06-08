@@ -92,6 +92,8 @@ function handleServerMessage(msg) {
 
         const overlay = document.getElementById('win-overlay');
         if (overlay) overlay.remove();
+        const historySection = document.getElementById('cell-history-section');
+        if (historySection) historySection.remove();
 
         // Show waiting state again
         document.getElementById('waiting-state').style.display = 'block';
