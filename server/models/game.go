@@ -72,10 +72,18 @@ type GameMove struct {
 	PlayerName string `json:"player_name,omitempty"`
 }
 
+type CellAttempt struct {
+	UserID     int    `json:"user_id"`
+	Username   string `json:"username"`
+	PlayerName string `json:"player_name"`
+	Valid      bool   `json:"valid"`
+}
+
 // GameState represents the current state of a game for real-time updates
 type GameState struct {
-	Game    Game            `json:"game"`
-	Players []GamePlayer    `json:"players"`
-	Moves   []GameMove      `json:"moves"`
-	Grid    [3][3]*GameMove `json:"grid"` // 2D array showing current grid state
+	Game        Game                `json:"game"`
+	Players     []GamePlayer        `json:"players"`
+	Moves       []GameMove          `json:"moves"`
+	Grid        [3][3]*GameMove     `json:"grid"`         // 2D array showing current grid state
+	CellHistory [3][3][]CellAttempt `json:"cell_history"` // History of attempts for each cell
 }

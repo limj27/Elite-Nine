@@ -125,10 +125,11 @@ function handleServerMessage(msg) {
       break;
 
     case 'game_state':
-      console.log('game_state received, current_turn:', msg.payload?.game?.current_turn, 
-      'playerIndex AT THIS MOMENT:', State.playerIndex);
       if (msg.payload?.players) {
         State.players = msg.payload.players;
+      }
+      if (msg.payload?.cell_history) {
+        State.cellHistory = msg.payload.cell_history;
       }
       onGameState(msg.payload);
       break;

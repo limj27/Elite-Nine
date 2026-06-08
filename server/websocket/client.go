@@ -514,6 +514,21 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
+	// Record attempt in cell history regardless of validity
+	attempt := models.CellAttempt{
+		UserID:     uid,
+		Username:   c.username,
+		PlayerName: p.Answer,
+		Valid:      result.Valid,
+	}
+	if result.Valid {
+		attempt.PlayerName = result.Answer.PlayerName
+	}
+	room.GameModel.CellHistory[p.Row][p.Col] = append(
+		room.GameModel.CellHistory[p.Row][p.Col],
+		attempt,
+	)
+
 	if result.Valid {
 		move.IsValid = true
 		move.PlayerName = result.Answer.PlayerName

@@ -15,6 +15,7 @@ const State = {
   playerIndex: 0,
   players: [],
   gridTemplate: null, 
+  cellHistrory: null,
 };
 
 // ═══════════════════════════════════════════════════════════

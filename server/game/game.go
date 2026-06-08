@@ -71,10 +71,17 @@ func CheckWin(state *models.GameState, userID int) bool {
 
 // NewGameState initializes a new GameState for a started game.
 func NewGameState(game models.Game, players []models.GamePlayer) *models.GameState {
+	var history [3][3][]models.CellAttempt
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			history[i][j] = []models.CellAttempt{}
+		}
+	}
 	return &models.GameState{
-		Game:    game,
-		Players: players,
-		Moves:   []models.GameMove{},
-		Grid:    [3][3]*models.GameMove{},
+		Game:        game,
+		Players:     players,
+		Moves:       []models.GameMove{},
+		Grid:        [3][3]*models.GameMove{},
+		CellHistory: history,
 	}
 }
