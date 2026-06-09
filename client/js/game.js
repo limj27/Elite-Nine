@@ -306,13 +306,6 @@ function onCellClick(idx) {
   }
 
   selectedCell = idx;
-
-  // Close history panel before opening search
-  setTimeout(() => {
-    const panel = document.getElementById('cell-history-panel');
-    if (panel) panel.remove();
-    openSearchModal();
-  }, 600); // brief delay so player can see the history before search opens
 }
 
 function renderGridHeaders() {
@@ -371,7 +364,7 @@ function showCellHistory(idx) {
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -70%);
     background: var(--surface);
     border: 1px solid var(--border2);
     border-radius: 14px;
