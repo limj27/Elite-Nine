@@ -376,7 +376,7 @@ function showCellHistory(idx) {
     border: 1px solid var(--border2);
     border-radius: 14px;
     padding: 20px;
-    z-index: 300;
+    z-index: 1000;
     min-width: 320px;
     max-width: 420px;
     max-height: 320px;
