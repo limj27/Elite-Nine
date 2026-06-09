@@ -306,6 +306,9 @@ function onCellClick(idx) {
   }
 
   selectedCell = idx;
+
+  // Close history panel before opening search
+  openSearchModal();
 }
 
 function renderGridHeaders() {
@@ -362,9 +365,9 @@ function showCellHistory(idx) {
   panel.id = 'cell-history-panel';
   panel.style.cssText = `
     position: fixed;
-    top: 50%;
+    top: 25%;
     left: 50%;
-    transform: translate(-50%, -70%);
+    transform: translate(-50%, -50%);
     background: var(--surface);
     border: 1px solid var(--border2);
     border-radius: 14px;
