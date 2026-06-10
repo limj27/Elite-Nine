@@ -365,7 +365,7 @@ function showCellHistory(idx) {
   panel.id = 'cell-history-panel';
   panel.style.cssText = `
     position: fixed;
-    top: 25%;
+    top: 15%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: var(--surface);
