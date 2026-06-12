@@ -97,4 +97,12 @@ func SetupUserRoutes(router *mux.Router, userHandler *handlers.UserHandler, jwtS
 	protected.Use(sessions.AuthMiddleware(jwtService))
 	protected.HandleFunc("/profile", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/logout", userHandler.Logout).Methods("POST")
+	protected.HandleFunc("/profile/full", userHandler.GetFullProfile).Methods("GET")
+	protected.HandleFunc("/profile/check-username", userHandler.CheckUsernameAvailable).Methods("POST")
+	protected.HandleFunc("/profile/username", userHandler.UpdateUsername).Methods("PUT")
+	protected.HandleFunc("/profile/password", userHandler.UpdatePassword).Methods("PUT")
+	protected.HandleFunc("/profile/team", userHandler.UpdateFavoriteTeam).Methods("PUT")
+	protected.HandleFunc("/profile/history", userHandler.GetGameHistory).Methods("GET")
+	protected.HandleFunc("/profile", userHandler.DeleteAccount).Methods("DELETE")
+
 }
