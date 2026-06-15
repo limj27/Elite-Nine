@@ -51,8 +51,8 @@ function toggleCreateForm() {
 }
 
 function handleCreateRoom() {
-  const roomName = document.getElementById('create-room-name').value.trim();
-  const password = document.getElementById('create-room-password').value.trim();
+  const roomName = document.getElementById('new-room-name').value.trim();
+  const password = document.getElementById('new-room-pass').value.trim();
   const difficulty = document.getElementById('create-room-difficulty').value; // ADD THIS
  
   if (!roomName) {
