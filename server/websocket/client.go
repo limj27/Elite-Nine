@@ -47,6 +47,7 @@ type createRoomPayload struct {
 	RoomName   string `json:"room_name,omitempty"`
 	Password   string `json:"password,omitempty"`
 	MaxPlayers int    `json:"max_Players"`
+	Difficulty string `json:"difficulty,omitempty"`
 }
 
 type joinRoomPayload struct {
@@ -286,6 +287,16 @@ func (c *Client) handleCreateRoom(p createRoomPayload) {
 	room := NewGameRoom(requestedRoomID, roomName, roomPassword, c.userID)
 	room.State.MaxPlayers = p.MaxPlayers
 
+	difficulty := strings.ToLower(strings.TrimSpace(p.Difficulty))
+	switch difficulty {
+	case "easy", "regular", "hard":
+		room.Difficulty = difficulty
+		room.State.Difficulty = difficulty
+	default:
+		room.Difficulty = "regular"
+		room.State.Difficulty = "regular"
+	}
+
 	c.hub.AddRoom(room)
 	if err := room.AddPlayer(c); err != nil {
 		c.sendError(fmt.Sprintf("failed to join created room: %v", err))
@@ -436,9 +447,32 @@ func (c *Client) handleStartGame() {
 		return
 	}
 
-	// Pick a random grid template
+	// Pick a grid based on room difficulty and players' favorite teams
 	gridSvc := grid.NewService(c.hub.DB)
-	gridTemplate, err := gridSvc.GetRandomGrid()
+
+	var gridTemplate *grid.GridTemplate
+	var err error
+
+	if room.Difficulty == "hard" {
+		gridTemplate, err = gridSvc.GenerateGrid("hard", nil, nil)
+	} else {
+		ordered := room.GetOrderedClients()
+		var p1Fav, p2Fav *int
+
+		if len(ordered) >= 1 {
+			if uid, convErr := strconv.Atoi(ordered[0].userID); convErr == nil {
+				p1Fav, _ = grid.GetFavoriteTeamCriteriaID(c.hub.DB, uid)
+			}
+		}
+		if len(ordered) >= 2 {
+			if uid, convErr := strconv.Atoi(ordered[1].userID); convErr == nil {
+				p2Fav, _ = grid.GetFavoriteTeamCriteriaID(c.hub.DB, uid)
+			}
+		}
+
+		gridTemplate, err = gridSvc.GenerateGrid(room.Difficulty, p1Fav, p2Fav)
+	}
+
 	if err != nil {
 		log.Printf("Failed to get grid template: %v", err)
 		c.sendError("failed to load grid — make sure the database is populated")
@@ -465,11 +499,12 @@ func (c *Client) handleStartGame() {
 		cl.sendJSON(map[string]interface{}{
 			"type": "game_started",
 			"payload": map[string]interface{}{
-				"playerIndex": i,
-				"roomId":      room.ID,
-				"rowCriteria": gridTemplate.RowCriteria,
-				"colCriteria": gridTemplate.ColCriteria,
-				"difficulty":  gridTemplate.Difficulty,
+				"playerIndex":    i,
+				"roomId":         room.ID,
+				"rowCriteria":    gridTemplate.RowCriteria,
+				"colCriteria":    gridTemplate.ColCriteria,
+				"difficulty":     gridTemplate.Difficulty,
+				"roomDifficulty": room.Difficulty,
 			},
 		})
 	}
@@ -514,51 +549,10 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		return
 	}
 
-	// Record attempt in cell history regardless of validity
-	attempt := models.CellAttempt{
-		UserID:     uid,
-		Username:   c.username,
-		PlayerName: p.Answer,
-		Valid:      result.Valid,
-	}
-	if result.Valid {
-		attempt.PlayerName = result.Answer.PlayerName
-	}
-	room.GameModel.CellHistory[p.Row][p.Col] = append(
-		room.GameModel.CellHistory[p.Row][p.Col],
-		attempt,
-	)
-
 	if result.Valid {
 		move.IsValid = true
 		move.PlayerName = result.Answer.PlayerName
 		move.Headshot = result.Answer.HeadshotURL
-		move.MLBPlayerID = result.Answer.MlbID
-
-		// Check if this player is already used anywhere in the grid
-		for row := 0; row < 3; row++ {
-			for col := 0; col < 3; col++ {
-				// Skip the cell being played (allow replacing same cell)
-				if row == p.Row && col == p.Col {
-					continue
-				}
-				existing := room.GameModel.Grid[row][col]
-				if existing != nil && existing.MLBPlayerID == result.Answer.MlbID {
-					c.sendJSON(map[string]interface{}{
-						"type": "invalid_move",
-						"payload": map[string]interface{}{
-							"message": result.Answer.PlayerName + " is already used in the grid",
-							"answer":  p.Answer,
-						},
-					})
-					room.Broadcast(mustMarshal(map[string]interface{}{
-						"type":    "game_state",
-						"payload": room.GameModel,
-					}))
-					return
-				}
-			}
-		}
 
 		existingMove := room.GameModel.Grid[p.Row][p.Col]
 
@@ -568,8 +562,7 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 
 			if game.CheckWin(room.GameModel, uid) {
 				room.GameModel.Game.Status = models.GameStatusCompleted
-				winnerID := uid                          // copy to new variable
-				room.GameModel.Game.WinnerID = &winnerID // safe pointer
+				room.GameModel.Game.WinnerID = &uid
 			}
 
 		} else {
@@ -592,8 +585,7 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 
 				if game.CheckWin(room.GameModel, uid) {
 					room.GameModel.Game.Status = models.GameStatusCompleted
-					winnerID := uid                          // copy to new variable
-					room.GameModel.Game.WinnerID = &winnerID // safe pointer
+					room.GameModel.Game.WinnerID = &uid
 				}
 
 				room.Broadcast(mustMarshal(map[string]interface{}{

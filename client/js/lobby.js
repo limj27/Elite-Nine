@@ -12,33 +12,34 @@ function requestRoomList() {
 }
 
 function renderRoomList(rooms) {
-  const el = document.getElementById('rooms-list');
-
+  const container = document.getElementById('room-list');
+ 
   if (!rooms.length) {
-    el.innerHTML = `
-      <div class="empty-rooms">
-        <div class="big">⚾</div>
-        <p>No open rooms yet.<br>Be the first to create one.</p>
-      </div>`;
+    container.innerHTML = '<div class="empty-state">No rooms available. Create one!</div>';
     return;
   }
-
-  el.innerHTML = rooms.map(r => {
-    const locked     = r.has_password ? `<span class="lock-icon">🔒</span>` : '';
-    const pips       = [0, 1].map(i => `<div class="pip ${i < (r.player_count || 0) ? 'filled' : ''}"></div>`).join('');
-    const statusClass = r.status === 'ready'  ? 'status-ready'
-                      : r.status === 'active' ? 'status-active'
-                      : 'status-waiting';
+ 
+  container.innerHTML = rooms.map(room => {
+    const statusClass = room.status === 'waiting' ? 'status-waiting'
+                       : room.status === 'active'  ? 'status-active'
+                       : 'status-closed';
+ 
+    const difficultyClass = 'difficulty-' + (room.difficulty || 'regular');
+    const difficultyLabel = (room.difficulty || 'regular').charAt(0).toUpperCase()
+                           + (room.difficulty || 'regular').slice(1);
+ 
+    const lockIcon = room.has_password ? '🔒 ' : '';
+ 
     return `
-      <div class="room-card" onclick="handleJoinClick('${r.id}', '${r.name}', ${!!r.has_password})">
-        <div class="room-card-left">
-          <div class="room-card-name">${r.name} ${locked}</div>
-          <div class="room-card-meta">
-            <div class="players-pip">${pips}</div>
-            <span>${r.player_count || 0}/${r.max_players || 2} players</span>
+      <div class="room-item" onclick="handleJoinRoomClick('${room.id}', ${room.has_password})">
+        <div class="room-info">
+          <div class="room-name">${lockIcon}${room.name}</div>
+          <div class="room-meta">
+            <span class="badge ${statusClass}">${room.status}</span>
+            <span class="badge ${difficultyClass}">${difficultyLabel}</span>
+            <span class="room-players">${room.player_count}/${room.max_players} players</span>
           </div>
         </div>
-        <span class="room-status ${statusClass}">${r.status || 'waiting'}</span>
       </div>`;
   }).join('');
 }
@@ -50,20 +51,21 @@ function toggleCreateForm() {
 }
 
 function handleCreateRoom() {
-  const name = document.getElementById('new-room-name').value.trim();
-  const pass = document.getElementById('new-room-pass').value;
-
-  if (!name) {
+  const roomName = document.getElementById('create-room-name').value.trim();
+  const password = document.getElementById('create-room-password').value.trim();
+  const difficulty = document.getElementById('create-room-difficulty').value; // ADD THIS
+ 
+  if (!roomName) {
     showToast('Room name is required', 'error');
     return;
   }
-
-  wsSend('create_room', { room_name: name, password: pass, max_players: 2 });
-
-  // Reset and hide the form
-  document.getElementById('create-form').classList.remove('show');
-  document.getElementById('new-room-name').value = '';
-  document.getElementById('new-room-pass').value = '';
+ 
+  wsSend('create_room', {
+    room_name: roomName,
+    password:  password,
+    max_players: 2,
+    difficulty: difficulty, // ADD THIS
+  });
 }
 
 // ── Join room ───────────────────────────────────────────────

@@ -81,6 +81,14 @@
           <label>Password (optional)</label>
           <input id="new-room-pass" type="password" placeholder="leave blank for public">
         </div>
+        <div class="field">
+          <label>Difficulty</label>
+          <select id="create-room-difficulty" class="input">
+            <option value="easy">Easy — uses both players' favorite teams</option>
+            <option value="regular" selected>Regular — one favorite team per side</option>
+            <option value="hard">Hard — fully random</option>
+          </select>
+        </div>
         <div class="create-form-btns">
           <button class="btn btn-primary" onclick="handleCreateRoom()" style="flex:1;">Create</button>
           <button class="btn btn-outline" onclick="toggleCreateForm()">Cancel</button>

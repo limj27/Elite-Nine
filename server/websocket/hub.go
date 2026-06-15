@@ -152,6 +152,7 @@ type RoomSummary struct {
 	MaxPlayers  int    `json:"max_players"`
 	Status      string `json:"status"`
 	HasPassword bool   `json:"has_password"`
+	Difficulty  string `json:"difficulty"`
 }
 
 func (h *Hub) GetRoom(roomID string) (*GameRoom, bool) {
@@ -189,6 +190,7 @@ func (h *Hub) ListRooms() []RoomSummary {
 			MaxPlayers:  room.State.MaxPlayers,
 			Status:      room.State.Status,
 			HasPassword: room.Password != "",
+			Difficulty:  room.Difficulty,
 		})
 	}
 	return rooms

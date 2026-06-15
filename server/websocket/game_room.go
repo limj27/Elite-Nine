@@ -34,6 +34,7 @@ type GameRoom struct {
 	GameManager    *GameManager
 	GameStatus     string
 	GridTemplateID int
+	Difficulty     string // "easy" | "regular" | "hard"
 
 	RematchRequests map[string]bool // playerID -> accepted
 	rematchMu       sync.Mutex
@@ -43,6 +44,7 @@ type GameState struct {
 	Status      string `json:"status"`
 	PlayerCount int    `json:"player_count"`
 	MaxPlayers  int    `json:"max_players"`
+	Difficulty  string `json:"difficulty"`
 }
 
 type RematchRequest struct {
@@ -59,10 +61,12 @@ func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 		Players:      make(map[string]*Client),
 		playerOrder:  make([]string, 0),
 		readyPlayers: make(map[string]bool),
+		Difficulty:   "regular",
 		State: GameState{
 			Status:      "waiting",
 			PlayerCount: 0,
 			MaxPlayers:  2, // default
+			Difficulty:  "regular",
 		},
 		CreatedAt:       time.Now(),
 		RematchRequests: make(map[string]bool),

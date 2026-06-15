@@ -357,6 +357,37 @@ body {
 .how-to-play strong { color: var(--text); }
 .how-to-play .amber { color: var(--amber); }
 
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+ 
+.status-waiting { background: rgba(234,179,8,0.15); color: #eab308; }
+.status-active  { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.status-closed  { background: rgba(148,163,184,0.15); color: #94a3b8; }
+ 
+.difficulty-easy    { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.difficulty-regular { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.difficulty-hard    { background: rgba(239,68,68,0.15);  color: #ef4444; }
+ 
+.room-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+ 
+.room-players {
+  font-size: 12px;
+  color: var(--text2);
+}
+
 /* ═══════════════════════════════════════════
    MODALS
 ═══════════════════════════════════════════ */
