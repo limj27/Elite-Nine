@@ -115,7 +115,7 @@ function handleServerMessage(msg) {
               colCriteria: msg.payload.colCriteria,
           };
           updatePlayerColors();
-          renderGridHeaders();  // new function
+          renderGridHeaders(); 
       }
       if (!State.gameStarted) {
           State.gameStarted = true;

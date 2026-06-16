@@ -100,25 +100,21 @@ function updateReadyUI() {
 function handleStartGame() {
   if (!State.isCreator) return;
   wsSend('start_game', {});
+  showGridLoading(); 
 }
 
 // ── Game state updates ───────────────────────────────────────
 
 function onGameState(payload) {
-  if (!State.gameStarted) {
-    State.gameStarted = true;
-    document.getElementById('waiting-state').style.display = 'none';
-    document.getElementById('grid-wrap').style.display     = 'flex';
-    document.getElementById('ready-section').style.display = 'none';
-    buildGrid();
-  }
-
-  // Check for game over — must come before turn update
+  // Check for game over first
   if (payload?.game?.status === 'completed' && payload?.game?.winner_id) {
     if (payload?.grid) updateGridFromState(payload.grid);
     setTimeout(() => showWinScreen(payload.game.winner_id), 500);
     return;
   }
+
+  // Only update if game is actually started
+  if (!State.gameStarted) return;
 
   if (payload?.game?.current_turn !== undefined) {
     updateTurnBar(payload.game.current_turn);
@@ -243,6 +239,16 @@ function handleLeaveRoom() {
 // ═══════════════════════════════════════════════════════════
 // GRID
 // ═══════════════════════════════════════════════════════════
+function showGridLoading() {
+  const waitingState = document.getElementById('waiting-state');
+  if (waitingState) {
+    waitingState.innerHTML = `
+      <div class="spinner" style="width:40px;height:40px;border-width:3px;margin-bottom:20px;"></div>
+      <h2>GENERATING GRID</h2>
+      <p>Building your personalized grid...</p>
+    `;
+  }
+}
 
 function buildGrid() {
   const grid = document.getElementById('the-grid');
