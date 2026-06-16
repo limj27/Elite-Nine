@@ -12,32 +12,38 @@ function requestRoomList() {
 }
 
 function renderRoomList(rooms) {
-  const container = document.getElementById('room-list');
- 
-  if (!rooms.length) {
-    container.innerHTML = '<div class="empty-state">No rooms available. Create one!</div>';
+  const container = document.getElementById('rooms-list');  // ← add the 's'
+  if (!container) return;  // ← also add this safety check
+
+  if (!rooms || !rooms.length) {
+    container.innerHTML = `
+      <div class="empty-rooms">
+        <div class="big">⚾</div>
+        <p>No open rooms yet.<br>Be the first to create one.</p>
+      </div>`;
     return;
   }
- 
+
   container.innerHTML = rooms.map(room => {
-    const statusClass = room.status === 'waiting' ? 'status-waiting'
-                       : room.status === 'active'  ? 'status-active'
-                       : 'status-closed';
- 
     const difficultyClass = 'difficulty-' + (room.difficulty || 'regular');
     const difficultyLabel = (room.difficulty || 'regular').charAt(0).toUpperCase()
                            + (room.difficulty || 'regular').slice(1);
- 
     const lockIcon = room.has_password ? '🔒 ' : '';
- 
+    const pip = (filled) => `<div class="pip${filled ? ' filled' : ''}"></div>`;
+    const pips = Array.from({length: room.max_players}, (_, i) =>
+      pip(i < room.player_count)).join('');
+
     return `
-      <div class="room-item" onclick="handleJoinRoomClick('${room.id}', ${room.has_password})">
-        <div class="room-info">
-          <div class="room-name">${lockIcon}${room.name}</div>
-          <div class="room-meta">
-            <span class="badge ${statusClass}">${room.status}</span>
+      <div class="room-card" onclick="handleJoinRoomClick('${room.id}', ${room.has_password})">
+        <div class="room-card-left">
+          <div class="room-card-name">
+            ${lockIcon}${room.name}
+          </div>
+          <div class="room-card-meta">
+            <span class="room-status status-${room.status}">${room.status}</span>
             <span class="badge ${difficultyClass}">${difficultyLabel}</span>
-            <span class="room-players">${room.player_count}/${room.max_players} players</span>
+            <div class="players-pip">${pips}</div>
+            <span>${room.player_count}/${room.max_players}</span>
           </div>
         </div>
       </div>`;
