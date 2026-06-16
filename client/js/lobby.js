@@ -34,7 +34,7 @@ function renderRoomList(rooms) {
       pip(i < room.player_count)).join('');
 
     return `
-      <div class="room-card" onclick="handleJoinRoomClick('${room.id}', ${room.has_password})">
+      <div class="room-card" onclick="handleJoinClick('${room.id}', '${room.name}', ${room.has_password})">
         <div class="room-card-left">
           <div class="room-card-name">
             ${lockIcon}${room.name}
