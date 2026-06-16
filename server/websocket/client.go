@@ -509,12 +509,6 @@ func (c *Client) handleStartGame() {
 		})
 	}
 
-	// Notify both players grid is being generated
-	room.Broadcast(mustMarshal(map[string]interface{}{
-		"type":    "grid_generating",
-		"payload": map[string]interface{}{"roomId": room.ID},
-	}))
-
 	// Broadcast initial game state
 	room.Broadcast(mustMarshal(map[string]interface{}{
 		"type":    "game_state",

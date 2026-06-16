@@ -72,12 +72,13 @@ function handleServerMessage(msg) {
     case 'player_ready':  onPlayerReady(msg.payload);   break;
 
     case 'room_ready':
-      console.log('room_ready received, isCreator:', State.isCreator);
-      if (State.isCreator) {
-        document.getElementById('start-btn').disabled = false;
-        showToast('Both players ready! You can start the game.', 'success');
-      }
-      break;
+        if (State.isCreator) {
+            document.getElementById('start-btn').disabled = false;
+            showToast('Both players ready! You can start the game.', 'success');
+        } else {
+            showGridLoading(); // non-creator sees loading while waiting for creator to start
+        }
+        break;
     case 'game_ended':
         onGameEnded(msg.payload);
         break;
@@ -107,9 +108,6 @@ function handleServerMessage(msg) {
         break;
     }
     // ── Game ─────────────────────────────────────────────────
-    case 'grid_generating':
-        showGridLoading();
-        break;
     case 'game_started':
       if (msg.payload?.playerIndex !== undefined) {
           State.playerIndex    = msg.payload.playerIndex;

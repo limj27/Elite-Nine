@@ -240,6 +240,8 @@ function handleLeaveRoom() {
 // GRID
 // ═══════════════════════════════════════════════════════════
 function showGridLoading() {
+    if (State.gameStarted) return; // don't show if game already started
+
     const waitingState = document.getElementById('waiting-state');
     if (waitingState) {
         waitingState.style.display = 'block';
@@ -249,7 +251,6 @@ function showGridLoading() {
             <p>Building your personalized grid...</p>
         `;
     }
-    // Also remove the ready section so it doesn't overlap
     const readySection = document.getElementById('ready-section');
     if (readySection) readySection.style.display = 'none';
     const startBtn = document.getElementById('start-btn');
