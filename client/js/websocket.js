@@ -82,12 +82,12 @@ function handleServerMessage(msg) {
         onGameEnded(msg.payload);
         break;
 
-    case 'rematch':
+    case 'rematch': {
         // Reset game state and go back to ready screen
-        State.gameStarted = false;
-        State.myReady     = false;
-        State.oppReady    = false;
-        State.playerIndex = 0;
+        State.gameStarted  = false;
+        State.myReady      = false;
+        State.oppReady     = false;
+        State.playerIndex  = 0;
         State.gridTemplate = null;
 
         const overlay = document.getElementById('win-overlay');
@@ -102,10 +102,10 @@ function handleServerMessage(msg) {
         document.getElementById('start-btn').disabled          = true;
         document.getElementById('ready-btn').textContent       = 'Mark Ready';
 
-        // Reset ready UI
         updateReadyUI();
         showToast('Rematch started — mark ready to play again!', 'success');
         break;
+    }
     // ── Game ─────────────────────────────────────────────────
     case 'game_started':
       if (msg.payload?.playerIndex !== undefined) {
