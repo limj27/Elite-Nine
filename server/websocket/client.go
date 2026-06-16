@@ -509,6 +509,12 @@ func (c *Client) handleStartGame() {
 		})
 	}
 
+	// Notify both players grid is being generated
+	room.Broadcast(mustMarshal(map[string]interface{}{
+		"type":    "grid_generating",
+		"payload": map[string]interface{}{"roomId": room.ID},
+	}))
+
 	// Broadcast initial game state
 	room.Broadcast(mustMarshal(map[string]interface{}{
 		"type":    "game_state",
@@ -548,6 +554,22 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		c.sendError(err.Error())
 		return
 	}
+
+	// Record attempt in cell history regardless of validity
+	playerName := p.Answer
+	if result.Valid {
+		playerName = result.Answer.PlayerName
+	}
+	attempt := models.CellAttempt{
+		UserID:     uid,
+		Username:   c.username,
+		PlayerName: playerName,
+		Valid:      result.Valid,
+	}
+	room.GameModel.CellHistory[p.Row][p.Col] = append(
+		room.GameModel.CellHistory[p.Row][p.Col],
+		attempt,
+	)
 
 	if result.Valid {
 		move.IsValid = true

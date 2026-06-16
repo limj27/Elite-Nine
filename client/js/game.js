@@ -240,14 +240,20 @@ function handleLeaveRoom() {
 // GRID
 // ═══════════════════════════════════════════════════════════
 function showGridLoading() {
-  const waitingState = document.getElementById('waiting-state');
-  if (waitingState) {
-    waitingState.innerHTML = `
-      <div class="spinner" style="width:40px;height:40px;border-width:3px;margin-bottom:20px;"></div>
-      <h2>GENERATING GRID</h2>
-      <p>Building your personalized grid...</p>
-    `;
-  }
+    const waitingState = document.getElementById('waiting-state');
+    if (waitingState) {
+        waitingState.style.display = 'block';
+        waitingState.innerHTML = `
+            <div class="spinner" style="width:40px;height:40px;border-width:3px;margin-bottom:20px;"></div>
+            <h2>GENERATING GRID</h2>
+            <p>Building your personalized grid...</p>
+        `;
+    }
+    // Also remove the ready section so it doesn't overlap
+    const readySection = document.getElementById('ready-section');
+    if (readySection) readySection.style.display = 'none';
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) startBtn.disabled = true;
 }
 
 function buildGrid() {

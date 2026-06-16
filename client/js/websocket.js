@@ -107,6 +107,9 @@ function handleServerMessage(msg) {
         break;
     }
     // ── Game ─────────────────────────────────────────────────
+    case 'grid_generating':
+        showGridLoading();
+        break;
     case 'game_started':
       if (msg.payload?.playerIndex !== undefined) {
           State.playerIndex    = msg.payload.playerIndex;
