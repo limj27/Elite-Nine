@@ -60,6 +60,7 @@
     <div class="topbar-logo">ELITE<span>9</span></div>
     <div class="topbar-user">
       <span class="user-badge" id="lobby-username"></span>
+      <button class="btn btn-outline btn-sm" onclick="openSettings()">⚙️</button>
       <button class="btn btn-outline btn-sm" onclick="handleLogout()">Sign Out</button>
     </div>
   </div>
@@ -108,7 +109,7 @@
       <div class="how-to-play">
         <p>Fill a <strong>3×3 grid</strong> with MLB players that match row + column criteria.</p>
         <p>Players alternate turns. Get <strong>3 in a row</strong> to win.</p>
-        <p><strong class="amber">Overtake</strong> an opponent's cell by entering a rarer answer — rarity is based on how frequently a player appears as a correct answer.</p>
+        <p><strong class="amber">Overtake</strong> an opponent's cell by entering a rarer answer — rarity is based on how accomplished a player is.</p>
         <p>The rarer your pick, the harder to beat.</p>
       </div>
     </div>
@@ -136,33 +137,29 @@
       </div>
 
       <div id="grid-wrap" style="display:none; flex-direction:column; align-items:center; gap:16px;">
-          <div class="turn-bar" id="turn-bar">
-              <div class="turn-dot"></div>
-              <span id="turn-text">Waiting...</span>
-          </div>
+        <div class="turn-bar" id="turn-bar">
+          <div class="turn-dot"></div>
+          <span id="turn-text">Waiting...</span>
+        </div>
 
-          <!-- Grid with headers -->
+        <!-- Grid with headers -->
+        <div style="display:flex;">
+          <div style="width:80px; height:60px;"></div>
           <div style="display:flex;">
-              <!-- Top-left empty corner -->
-              <div style="width:80px; height:60px;"></div>
-              <!-- Column headers -->
-              <div style="display:flex;">
-                  <div class="grid-header col-header" id="col-header-0"></div>
-                  <div class="grid-header col-header" id="col-header-1"></div>
-                  <div class="grid-header col-header" id="col-header-2"></div>
-              </div>
+            <div class="grid-header col-header" id="col-header-0"></div>
+            <div class="grid-header col-header" id="col-header-1"></div>
+            <div class="grid-header col-header" id="col-header-2"></div>
           </div>
+        </div>
 
-          <div style="display:flex;">
-              <!-- Row headers -->
-              <div style="display:flex; flex-direction:column;">
-                  <div class="grid-header row-header" id="row-header-0"></div>
-                  <div class="grid-header row-header" id="row-header-1"></div>
-                  <div class="grid-header row-header" id="row-header-2"></div>
-              </div>
-              <!-- The actual grid -->
-              <div class="grid-wrap" id="the-grid"></div>
+        <div style="display:flex;">
+          <div style="display:flex; flex-direction:column;">
+            <div class="grid-header row-header" id="row-header-0"></div>
+            <div class="grid-header row-header" id="row-header-1"></div>
+            <div class="grid-header row-header" id="row-header-2"></div>
           </div>
+          <div class="grid-wrap" id="the-grid"></div>
+        </div>
       </div>
     </div>
 
@@ -207,6 +204,82 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════ SETTINGS SCREEN -->
+<div id="screen-settings" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">ELITE<span>9</span></div>
+    <div class="topbar-user">
+      <button class="btn btn-outline btn-sm" onclick="showScreen('lobby')">← Back to Lobby</button>
+    </div>
+  </div>
+
+  <div class="settings-body">
+    <div class="settings-main">
+
+      <!-- USERNAME -->
+      <div class="settings-card">
+        <div class="settings-card-title">Change Username</div>
+        <div class="field">
+          <label>New Username</label>
+          <input id="settings-username" type="text" placeholder="enter new username"
+                 oninput="checkUsernameAvailability()">
+          <div id="username-availability" class="availability-msg"></div>
+        </div>
+        <button class="btn btn-primary" onclick="handleUpdateUsername()" id="update-username-btn"
+                style="margin-top:8px;">Update Username</button>
+      </div>
+
+      <!-- PASSWORD -->
+      <div class="settings-card">
+        <div class="settings-card-title">Change Password</div>
+        <div class="field">
+          <label>Current Password</label>
+          <input id="settings-current-password" type="password" placeholder="••••••••">
+        </div>
+        <div class="field">
+          <label>New Password</label>
+          <input id="settings-new-password" type="password" placeholder="min 8 characters">
+        </div>
+        <button class="btn btn-primary" onclick="handleUpdatePassword()"
+                style="margin-top:8px;">Update Password</button>
+      </div>
+
+      <!-- FAVORITE TEAM -->
+      <div class="settings-card">
+        <div class="settings-card-title">Favorite Team</div>
+        <div id="current-favorite-team" class="current-team-display">
+          <span class="team-logo-wrap" id="fav-team-logo"></span>
+          <span id="fav-team-name">No favorite team set</span>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Search Teams</label>
+          <input id="team-search-input" type="text" placeholder="e.g. Yankees, Dodgers..."
+                 oninput="handleTeamSearch(this.value)">
+        </div>
+        <div id="team-search-results" class="team-results"></div>
+      </div>
+
+      <!-- DANGER ZONE -->
+      <div class="settings-card settings-card-danger">
+        <div class="settings-card-title" style="color:var(--red);">Danger Zone</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+          Deleting your account is permanent. Your game history will be preserved for your opponents.
+        </p>
+        <button class="btn btn-danger" onclick="showDeleteConfirm()">Delete Account</button>
+      </div>
+
+    </div>
+
+    <!-- GAME HISTORY -->
+    <div class="settings-sidebar">
+      <div class="section-title">Game History</div>
+      <div id="game-history-list" class="game-history-list">
+        <div class="empty-state">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Password modal -->
 <div class="modal-overlay" id="password-modal">
   <div class="modal">
@@ -237,6 +310,23 @@
   </div>
 </div>
 
+<!-- Delete account confirmation modal -->
+<div class="modal-overlay" id="delete-confirm-modal">
+  <div class="modal">
+    <h3 style="color:var(--red);">⚠️ Delete Account</h3>
+    <p style="font-size:14px;color:var(--text2);margin:12px 0;">
+      This cannot be undone. Type <strong>DELETE</strong> to confirm.
+    </p>
+    <div class="field">
+      <input id="delete-confirm-input" type="text" placeholder="type DELETE to confirm">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeDeleteConfirm()">Cancel</button>
+      <button class="btn btn-danger" onclick="handleDeleteAccount()">Delete My Account</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -246,5 +336,6 @@
 <script src="js/websocket.js"></script>
 <script src="js/lobby.js"></script>
 <script src="js/game.js"></script>
+<script src="js/settings.js"></script>
 </body>
 </html>
