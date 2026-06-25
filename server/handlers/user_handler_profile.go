@@ -38,7 +38,7 @@ type CheckUsernameRequest struct {
 // both and point the frontend at this one.
 
 func (uh *UserHandler) GetFullProfile(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	user, err := uh.userService.GetUserByIDWithTeam(userID)
 	if err != nil {
@@ -55,7 +55,7 @@ func (uh *UserHandler) GetFullProfile(w http.ResponseWriter, r *http.Request) {
 // Returns: {"available": true/false}
 
 func (uh *UserHandler) CheckUsernameAvailable(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	var req CheckUsernameRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -85,7 +85,7 @@ func (uh *UserHandler) CheckUsernameAvailable(w http.ResponseWriter, r *http.Req
 // Body: {"username": "newname"}
 
 func (uh *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	var req UpdateUsernameRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -132,7 +132,7 @@ func (uh *UserHandler) UpdateUsername(w http.ResponseWriter, r *http.Request) {
 // Body: {"current_password": "...", "new_password": "..."}
 
 func (uh *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	var req UpdatePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -163,7 +163,7 @@ func (uh *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 // Send {"team_id": 0} to clear the favorite team.
 
 func (uh *UserHandler) UpdateFavoriteTeam(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	var req UpdateFavoriteTeamRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -191,7 +191,7 @@ func (uh *UserHandler) UpdateFavoriteTeam(w http.ResponseWriter, r *http.Request
 // preserved for opponents; the username is anonymized and freed up.
 
 func (uh *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	if err := uh.userService.DeleteAccount(userID); err != nil {
 		http.Error(w, "Failed to delete account", http.StatusInternalServerError)
@@ -209,7 +209,7 @@ func (uh *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 // Returns recent completed games for the logged-in user.
 
 func (uh *UserHandler) GetGameHistory(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 
 	history, err := uh.userService.GetGameHistory(userID, 20)
 	if err != nil {

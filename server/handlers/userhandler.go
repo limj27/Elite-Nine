@@ -109,7 +109,7 @@ func (uh *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uh *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 	user, err := uh.userService.GetUserByID(userID)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
@@ -120,7 +120,7 @@ func (uh *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uh *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(int)
+	userID := r.Context().Value("userID").(int)
 	if err := uh.jwtService.RevokeToken(userID); err != nil {
 		http.Error(w, "Failed to logout", http.StatusInternalServerError)
 		return
