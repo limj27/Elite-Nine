@@ -10,8 +10,7 @@
 - Using Redis to store session cache
 
 ## Things to Implement:
-- Grid based on user's favorite team
-  - Update db with 002 file
-  - websocket.js line 25 error loading rooms
 - Change the color of ready button
 - Turn Timer (Feature to select when making the room)
+- Valid Answers not showing up
+- Set favorite team when creating account
