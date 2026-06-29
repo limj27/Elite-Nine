@@ -57,6 +57,13 @@ body {
   gap: 8px;
 }
 
+.btn-ready {
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+.btn-ready:hover { background: rgba(34,197,94,0.1); }
+
 .btn-primary { background: var(--blue); color: #fff; width: 100%; }
 .btn-primary:hover { background: var(--blue-dim); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }

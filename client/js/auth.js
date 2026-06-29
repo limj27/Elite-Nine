@@ -72,7 +72,7 @@ async function handleRegister(e) {
       return;
     }
 
-    onAuthSuccess(body.token, document.getElementById('reg-username').value.trim());
+    onAuthSuccess(body.token, document.getElementById('reg-username').value.trim(), true);
   } catch {
     errEl.textContent = 'Network error';
     errEl.classList.add('show');
@@ -82,12 +82,33 @@ async function handleRegister(e) {
   }
 }
 
-function onAuthSuccess(token, username) {
+function onAuthSuccess(token, username, isNewUser = false) {
   State.token      = token;
   State.myUsername = username;
   localStorage.setItem('elite9_token',    token);
   localStorage.setItem('elite9_username', username);
   document.getElementById('lobby-username').textContent = username;
+
+  if (isNewUser) {
+    // Show team picker before lobby
+    document.querySelector('.auth-wrap > *:not(#onboarding-team)').style.display = 'none';
+    // hide all auth children except onboarding
+    showOnboarding();
+  } else {
+    showScreen('lobby');
+    connectWebSocket();
+  }
+}
+
+function showOnboarding() {
+  document.getElementById('form-login').style.display    = 'none';
+  document.getElementById('form-register').style.display = 'none';
+  document.getElementById('onboarding-team').style.display = 'flex';
+  document.getElementById('onboarding-team').style.flexDirection = 'column';
+}
+
+function skipOnboardingTeam() {
+  document.getElementById('onboarding-team').style.display = 'none';
   showScreen('lobby');
   connectWebSocket();
 }

@@ -51,6 +51,41 @@
       </div>
       <button type="submit" class="btn btn-primary" id="register-btn">Create Account</button>
     </form>
+    
+    <div class="onboarding-wrap" id="onboarding-team" style="display:none;">
+      <div class="auth-logo" style="margin-bottom:24px;">
+        <h1>ELITE<span>9</span></h1>
+        <p>One more thing...</p>
+      </div>
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-family:var(--font-display);font-size:28px;letter-spacing:2px;">
+          PICK YOUR TEAM
+        </div>
+        <div style="font-size:13px;color:var(--text2);margin-top:6px;">
+          We'll use this to personalize your grids
+        </div>
+      </div>
+      <div class="field">
+        <label>Search Teams</label>
+        <input id="onboarding-team-search" type="text"
+              placeholder="e.g. Yankees, Dodgers..."
+              oninput="handleOnboardingTeamSearch(this.value)">
+      </div>
+      <div id="onboarding-team-results" class="team-results" style="margin-bottom:16px;"></div>
+      <div id="onboarding-selected-team" style="display:none;margin-bottom:16px;">
+        <div class="current-team-display">
+          <span id="onboarding-team-logo"></span>
+          <span id="onboarding-team-name"></span>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="handleOnboardingTeamSave()" 
+              id="onboarding-save-btn" style="margin-bottom:10px;">
+        Save & Continue
+      </button>
+      <button class="btn btn-outline" onclick="skipOnboardingTeam()">
+        Skip for now
+      </button>
+    </div>
   </div>
 </div>
 
@@ -189,7 +224,7 @@
       <div class="divider"></div>
 
       <div class="ready-btn-wrap" id="ready-section">
-        <button class="btn btn-outline" id="ready-btn" onclick="handleReady()">Mark Ready</button>
+        <button class="btn btn-ready" id="ready-btn" onclick="handleReady()">Mark Ready</button>
         <div class="ready-status">
           <div class="ready-dot" id="my-ready-dot"></div>
           <span id="my-ready-label">You: not ready</span>

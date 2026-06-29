@@ -333,3 +333,69 @@ async function handleDeleteAccount() {
     showToast('Network error', 'error');
   }
 }
+
+let onboardingSelectedTeam = null;
+
+async function handleOnboardingTeamSearch(query) {
+  const resultsEl = document.getElementById('onboarding-team-results');
+  if (query.length < 1) { resultsEl.innerHTML = ''; return; }
+
+  const teams   = await loadTeams();
+  const q       = query.toLowerCase();
+  const matches = teams.filter(t =>
+    t.name.toLowerCase().includes(q) ||
+    t.abbreviation?.toLowerCase().includes(q)
+  ).slice(0, 8);
+
+  if (!matches.length) {
+    resultsEl.innerHTML = '<div class="team-result-empty">No teams found</div>';
+    return;
+  }
+
+  resultsEl.innerHTML = matches.map(t => `
+    <div class="team-result-item"
+         onclick="selectOnboardingTeam(${t.id}, '${t.name.replace(/'/g, "\\'")}')">
+      <img src="https://www.mlbstatic.com/team-logos/${t.id}.svg"
+           style="width:28px;height:28px;object-fit:contain;"
+           onerror="this.style.display='none'">
+      <span>${t.name}</span>
+    </div>
+  `).join('');
+}
+
+function selectOnboardingTeam(teamID, teamName) {
+  onboardingSelectedTeam = { teamID, teamName };
+
+  document.getElementById('onboarding-team-results').innerHTML = '';
+  document.getElementById('onboarding-team-search').value      = teamName;
+  document.getElementById('onboarding-selected-team').style.display = 'block';
+  document.getElementById('onboarding-team-name').textContent  = teamName;
+  document.getElementById('onboarding-team-logo').innerHTML    = `
+    <img src="https://www.mlbstatic.com/team-logos/${teamID}.svg"
+         style="width:32px;height:32px;object-fit:contain;margin-right:10px;"
+         onerror="this.style.display='none'">`;
+}
+
+async function handleOnboardingTeamSave() {
+  if (!onboardingSelectedTeam) {
+    skipOnboardingTeam();
+    return;
+  }
+
+  try {
+    await authFetch('/api/profile/team', {
+      method: 'PUT',
+      body:   JSON.stringify({
+        team_id:   onboardingSelectedTeam.teamID,
+        team_name: onboardingSelectedTeam.teamName,
+      }),
+    });
+  } catch {
+    // non-fatal — just skip to lobby
+  }
+
+  onboardingSelectedTeam = null;
+  document.getElementById('onboarding-team').style.display = 'none';
+  showScreen('lobby');
+  connectWebSocket();
+}

@@ -76,7 +76,14 @@ function onPlayerLeft(payload) {
 function handleReady() {
   State.myReady = !State.myReady;
   wsSend('player_ready', { ready: State.myReady });
-  document.getElementById('ready-btn').textContent = State.myReady ? 'Cancel Ready' : 'Mark Ready';
+  const btn = document.getElementById('ready-btn');
+  if (State.myReady) {
+    btn.textContent  = 'Cancel Ready';
+    btn.className    = 'btn btn-outline'; // grey when cancelling
+  } else {
+    btn.textContent  = 'Mark Ready';
+    btn.className    = 'btn btn-ready';   // green when ready to mark
+  }
   updateReadyUI();
 }
 
