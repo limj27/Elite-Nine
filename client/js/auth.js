@@ -101,9 +101,11 @@ function onAuthSuccess(token, username, isNewUser = false) {
 }
 
 function showOnboarding() {
-  document.getElementById('form-login').style.display    = 'none';
-  document.getElementById('form-register').style.display = 'none';
-  document.getElementById('onboarding-team').style.display = 'flex';
+  document.getElementById('auth-tabs-wrap').style.display   = 'none';
+  document.getElementById('form-login').style.display       = 'none';
+  document.getElementById('form-register').style.display    = 'none';
+  document.querySelector('.auth-logo').style.display        = 'none'; // hide top logo
+  document.getElementById('onboarding-team').style.display  = 'flex';
   document.getElementById('onboarding-team').style.flexDirection = 'column';
 }
 
