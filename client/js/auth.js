@@ -37,8 +37,9 @@ async function handleLogin(e) {
     }
 
     onAuthSuccess(body.token, document.getElementById('login-username').value.trim());
-  } catch {
-    errEl.textContent = 'Network error';
+  } catch (err) {
+    console.error('Login error:', err);
+    errEl.textContent = err.message || 'Something went wrong — check console for details';
     errEl.classList.add('show');
   } finally {
     btn.disabled    = false;
@@ -73,8 +74,9 @@ async function handleRegister(e) {
     }
 
     onAuthSuccess(body.token, document.getElementById('reg-username').value.trim(), true);
-  } catch {
-    errEl.textContent = 'Network error';
+  } catch (err) {
+    console.error('Register error:', err);
+    errEl.textContent = err.message || 'Something went wrong — check console for details';
     errEl.classList.add('show');
   } finally {
     btn.disabled    = false;

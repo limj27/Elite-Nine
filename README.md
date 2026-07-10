@@ -10,7 +10,5 @@
 - Using Redis to store session cache
 
 ## Things to Implement:
-- Change the color of ready button
 - Turn Timer (Feature to select when making the room)
 - Valid Answers not showing up
-- Set favorite team when creating account
