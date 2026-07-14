@@ -514,6 +514,9 @@ func (c *Client) handleStartGame() {
 		"type":    "game_state",
 		"payload": room.GameModel,
 	}))
+
+	// Start the per-turn timer (no-op broadcast if difficulty is "easy")
+	room.StartTurnTimer(onTurnTimeout)
 }
 
 func (c *Client) handleMakeMove(p makeMovePayload) {
@@ -548,22 +551,6 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		c.sendError(err.Error())
 		return
 	}
-
-	// Record attempt in cell history regardless of validity
-	playerName := p.Answer
-	if result.Valid {
-		playerName = result.Answer.PlayerName
-	}
-	attempt := models.CellAttempt{
-		UserID:     uid,
-		Username:   c.username,
-		PlayerName: playerName,
-		Valid:      result.Valid,
-	}
-	room.GameModel.CellHistory[p.Row][p.Col] = append(
-		room.GameModel.CellHistory[p.Row][p.Col],
-		attempt,
-	)
 
 	if result.Valid {
 		move.IsValid = true
@@ -645,6 +632,14 @@ func (c *Client) handleMakeMove(p makeMovePayload) {
 		"type":    "game_state",
 		"payload": room.GameModel,
 	}))
+
+	// Restart the turn timer for whoever's turn it is now, unless the
+	// game just ended
+	if room.GameModel.Game.Status == models.GameStatusActive {
+		room.StartTurnTimer(onTurnTimeout)
+	} else {
+		room.StopTurnTimer()
+	}
 }
 
 // handleLeaveRoom handles a client leaving a game room.
@@ -718,6 +713,8 @@ func (c *Client) handleRematch() {
 		c.sendError("room not found")
 		return
 	}
+
+	room.StopTurnTimer()
 
 	// Reset ready states and game model
 	room.mu.Lock()

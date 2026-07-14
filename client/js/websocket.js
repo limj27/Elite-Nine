@@ -102,7 +102,7 @@ function handleServerMessage(msg) {
         document.getElementById('ready-section').style.display = 'flex';
         document.getElementById('start-btn').disabled          = true;
         document.getElementById('ready-btn').textContent       = 'Mark Ready';
-
+        stopTurnTimerDisplay();
         updateReadyUI();
         showToast('Rematch started — mark ready to play again!', 'success');
         break;
@@ -160,7 +160,15 @@ function handleServerMessage(msg) {
           'error'
       );
       break;
-    // ── Errors ───────────────────────────────────────────────
+
+    case 'turn_timer':
+      startTurnTimerDisplay(msg.payload?.deadline, msg.payload?.duration);
+      break;
+ 
+    case 'turn_timeout':
+      showToast('Time expired — turn skipped!', 'error');
+      break;
+    // ── Errors ─────────────────────────────────────────
     case 'error':
       showToast(msg.message || 'An error occurred', 'error');
       break;

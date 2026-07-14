@@ -111,6 +111,42 @@ function handleStartGame() {
 }
 
 // ── Game state updates ───────────────────────────────────────
+let turnTimerInterval = null;
+ 
+function startTurnTimerDisplay(deadlineMs, durationSec) {
+  clearInterval(turnTimerInterval);
+  const timerEl = document.getElementById('turn-timer');
+  if (!timerEl) return;
+ 
+  if (!durationSec || durationSec <= 0) {
+    timerEl.style.display = 'none';
+    return;
+  }
+ 
+  timerEl.style.display = 'inline-block';
+ 
+  function tick() {
+    const remainingMs  = deadlineMs - Date.now();
+    const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+    const mins = Math.floor(remainingSec / 60);
+    const secs = remainingSec % 60;
+    timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    timerEl.classList.toggle('timer-warning', remainingSec <= 10);
+ 
+    if (remainingMs <= 0) {
+      clearInterval(turnTimerInterval);
+    }
+  }
+ 
+  tick();
+  turnTimerInterval = setInterval(tick, 250);
+}
+ 
+function stopTurnTimerDisplay() {
+  clearInterval(turnTimerInterval);
+  const timerEl = document.getElementById('turn-timer');
+  if (timerEl) timerEl.style.display = 'none';
+}
 
 function onGameState(payload) {
   // Check for game over first
@@ -239,6 +275,7 @@ function handleLeaveRoom() {
   if (overlay) overlay.remove();
   const historySection = document.getElementById('cell-history-section');
   if (historySection) historySection.remove();
+  stopTurnTimerDisplay();
   showScreen('lobby');
   requestRoomList();
 }
@@ -583,6 +620,7 @@ function showWinScreen(winnerId) {
 // ═══════════════════════════════════════════════════════════
 
 function onGameEnded(payload) {
+    stopTurnTimerDisplay();
     // Update grid one final time
     if (payload?.final_state?.grid) {
         updateGridFromState(payload.final_state.grid);

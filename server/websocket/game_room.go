@@ -38,6 +38,10 @@ type GameRoom struct {
 
 	RematchRequests map[string]bool // playerID -> accepted
 	rematchMu       sync.Mutex
+
+	// Turn timer
+	turnTimer   *time.Timer
+	turnTimerMu sync.Mutex
 }
 
 type GameState struct {
@@ -70,6 +74,81 @@ func NewGameRoom(id, name, password, creatorID string) *GameRoom {
 		},
 		CreatedAt:       time.Now(),
 		RematchRequests: make(map[string]bool),
+	}
+}
+
+// turnDurationForDifficulty returns the per-turn time limit for a
+// given room difficulty. A duration of 0 means "no timer".
+func turnDurationForDifficulty(difficulty string) time.Duration {
+	switch difficulty {
+	case "hard":
+		return 30 * time.Second
+	case "regular":
+		return 60 * time.Second
+	default: // "easy" — untimed
+		return 0
+	}
+}
+
+// StartTurnTimer (re)starts the per-turn countdown for this room based
+// on its difficulty. Stops any existing timer first. onTimeout is
+// invoked in its own goroutine if the timer elapses without a move
+// being made — the caller is responsible for verifying the turn is
+// still the same one the timer was started for (turnAtStart).
+func (r *GameRoom) StartTurnTimer(onTimeout func(room *GameRoom, turnAtStart int)) {
+	duration := turnDurationForDifficulty(r.Difficulty)
+
+	r.turnTimerMu.Lock()
+	if r.turnTimer != nil {
+		r.turnTimer.Stop()
+		r.turnTimer = nil
+	}
+
+	if duration <= 0 {
+		r.turnTimerMu.Unlock()
+		// No timer for this difficulty — tell clients to hide any UI
+		r.Broadcast(mustMarshal(map[string]interface{}{
+			"type":    "turn_timer",
+			"payload": map[string]interface{}{"duration": 0},
+		}))
+		return
+	}
+
+	r.mu.RLock()
+	turnAtStart := 0
+	active := r.GameModel != nil && r.GameModel.Game.Status == models.GameStatusActive
+	if r.GameModel != nil {
+		turnAtStart = r.GameModel.Game.CurrentTurn
+	}
+	r.mu.RUnlock()
+
+	if !active {
+		r.turnTimerMu.Unlock()
+		return
+	}
+
+	deadline := time.Now().Add(duration)
+	r.turnTimer = time.AfterFunc(duration, func() {
+		onTimeout(r, turnAtStart)
+	})
+	r.turnTimerMu.Unlock()
+
+	r.Broadcast(mustMarshal(map[string]interface{}{
+		"type": "turn_timer",
+		"payload": map[string]interface{}{
+			"deadline": deadline.UnixMilli(),
+			"duration": int(duration.Seconds()),
+		},
+	}))
+}
+
+// StopTurnTimer cancels any active turn timer for this room.
+func (r *GameRoom) StopTurnTimer() {
+	r.turnTimerMu.Lock()
+	defer r.turnTimerMu.Unlock()
+	if r.turnTimer != nil {
+		r.turnTimer.Stop()
+		r.turnTimer = nil
 	}
 }
 
@@ -173,6 +252,7 @@ func (r *GameRoom) RemovePlayer(clientID string) bool {
 	r.Broadcast(leaveMsg.ToJSON())
 
 	if isEmpty {
+		r.StopTurnTimer()
 		r.Close()
 	}
 
@@ -199,6 +279,8 @@ func (r *GameRoom) SetReady(clientID string, ready bool) bool {
 }
 
 func (r *GameRoom) EndGame(winnerID int) {
+	r.StopTurnTimer()
+
 	r.mu.Lock()
 	r.GameStatus = "completed"
 	r.State.Status = "completed"
@@ -272,6 +354,8 @@ func (r *GameRoom) GetOrderedClients() []*Client {
 }
 
 func (r *GameRoom) Close() {
+	r.StopTurnTimer()
+
 	r.mu.Lock()
 	r.State.Status = "closed"
 
@@ -328,6 +412,8 @@ func (r *GameRoom) RequestRematch(clientID string) (bool, error) {
 }
 
 func (r *GameRoom) ResetForRematch() {
+	r.StopTurnTimer()
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

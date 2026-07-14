@@ -11,4 +11,4 @@
 
 ## Things to Implement:
 - Turn Timer (Feature to select when making the room)
-- Valid Answers not showing up
+- Instruction Page

@@ -40,6 +40,16 @@ func MakeMove(state *models.GameState, userID, row, col int, answer string) (*mo
 	return move, state.Game.CurrentTurn, nil
 }
 
+// SkipTurn advances the turn without placing a move — used when a
+// player's turn timer expires before they submit an answer.
+func SkipTurn(state *models.GameState) int {
+	if len(state.Players) == 0 {
+		return state.Game.CurrentTurn
+	}
+	state.Game.CurrentTurn = (state.Game.CurrentTurn + 1) % len(state.Players)
+	return state.Game.CurrentTurn
+}
+
 // CheckWin checks if the given user has won the game
 func CheckWin(state *models.GameState, userID int) bool {
 	grid := state.Grid
